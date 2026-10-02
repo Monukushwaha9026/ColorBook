@@ -1,0 +1,85 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 560" width="100%" height="100%">
+  <!-- White Background -->
+  <rect width="400" height="560" rx="16" fill="#ffffff" stroke="#1f2937" stroke-width="4"/>
+  
+  <!-- Stars in background -->
+  <g fill="none" stroke="#1f2937" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M 60 70 L 65 85 L 80 85 L 68 95 L 72 110 L 60 100 L 48 110 L 52 95 L 40 85 L 55 85 Z" />
+    <path d="M 330 90 L 334 102 L 346 102 L 336 110 L 340 122 L 330 114 L 320 122 L 324 110 L 314 102 L 326 102 Z" />
+    <path d="M 70 420 L 73 429 L 82 429 L 75 435 L 78 444 L 70 438 L 62 444 L 65 435 L 58 429 L 67 429 Z" />
+    <path d="M 325 430 L 328 439 L 337 439 L 330 445 L 333 454 L 325 448 L 317 454 L 320 445 L 313 439 L 322 439 Z" />
+    <!-- Small spark crosses -->
+    <path d="M 120 100 L 120 116 M 112 108 L 128 108" />
+    <path d="M 280 60 L 280 76 M 272 68 L 288 68" />
+  </g>
+
+  <!-- Robot Head & Antenna -->
+  <g fill="#ffffff" stroke="#1f2937" stroke-width="4" stroke-linecap="round" stroke-linejoin="round">
+    <!-- Antenna -->
+    <line x1="200" y1="130" x2="200" y2="90" />
+    <circle cx="200" cy="80" r="14" fill="#ffffff" />
+    <!-- Ears / bolts -->
+    <rect x="110" y="170" width="16" height="30" rx="6" fill="#ffffff" />
+    <rect x="274" y="170" width="16" height="30" rx="6" fill="#ffffff" />
+    <!-- Head block -->
+    <rect x="126" y="130" width="148" height="110" rx="24" fill="#ffffff" />
+    <!-- Screen frame inside head -->
+    <rect x="142" y="146" width="116" height="78" rx="14" fill="#ffffff" stroke-width="3" />
+    <!-- Eyes -->
+    <circle cx="172" cy="180" r="14" fill="#1f2937" />
+    <circle cx="168" cy="176" r="4" fill="#ffffff" />
+    <circle cx="228" cy="180" r="14" fill="#1f2937" />
+    <circle cx="224" cy="176" r="4" fill="#ffffff" />
+    <!-- Cheerful smile -->
+    <path d="M 180 204 Q 200 218 220 204" fill="none" stroke-width="4" />
+    <!-- Rosy cheek circles -->
+    <circle cx="156" cy="198" r="6" fill="none" stroke-width="2" stroke-dasharray="2 2" />
+    <circle cx="244" cy="198" r="6" fill="none" stroke-width="2" stroke-dasharray="2 2" />
+
+    <!-- Neck -->
+    <rect x="182" y="240" width="36" height="18" rx="4" fill="#ffffff" />
+    <line x1="182" y1="249" x2="218" y2="249" stroke-width="2" />
+
+    <!-- Robot Body -->
+    <rect x="130" y="258" width="140" height="150" rx="22" fill="#ffffff" />
+    <!-- Chest Screen with Heart Gauge -->
+    <rect x="150" y="278" width="100" height="60" rx="12" fill="#ffffff" stroke-width="3" />
+    <path d="M 200 322 C 185 305 170 295 185 285 C 195 280 200 292 200 292 C 200 292 205 280 215 285 C 230 295 215 305 200 322 Z" fill="#ffffff" stroke-width="3" />
+    <!-- Buttons and sliders -->
+    <circle cx="165" cy="365" r="10" fill="#ffffff" stroke-width="3" />
+    <circle cx="200" cy="365" r="10" fill="#ffffff" stroke-width="3" />
+    <circle cx="235" cy="365" r="10" fill="#ffffff" stroke-width="3" />
+    <line x1="165" y1="360" x2="165" y2="370" stroke-width="3" />
+    <line x1="195" y1="365" x2="205" y2="365" stroke-width="3" />
+    <circle cx="235" cy="365" r="4" fill="#1f2937" />
+
+    <!-- Left Arm -->
+    <path d="M 130 280 Q 90 285 85 320 Q 80 345 98 350 Q 110 340 106 315 Q 112 300 130 296" fill="#ffffff" stroke-width="4" />
+    <!-- Claw -->
+    <path d="M 85 348 C 70 350 65 370 80 376 C 90 370 95 358 85 348 Z" fill="#ffffff" stroke-width="3" />
+
+    <!-- Right Arm (Waving) -->
+    <path d="M 270 280 Q 310 270 325 240 Q 335 220 320 215 Q 305 225 300 248 Q 285 270 270 296" fill="#ffffff" stroke-width="4" />
+    <!-- Waving Claw -->
+    <circle cx="324" cy="208" r="14" fill="#ffffff" stroke-width="3" />
+    <path d="M 314 200 Q 324 190 334 200" fill="none" stroke-width="3" />
+
+    <!-- Legs & Feet -->
+    <rect x="152" y="408" width="32" height="50" rx="8" fill="#ffffff" stroke-width="4" />
+    <line x1="152" y1="425" x2="184" y2="425" stroke-width="2" />
+    <line x1="152" y1="440" x2="184" y2="440" stroke-width="2" />
+    <path d="M 140 458 Q 165 448 190 458 L 192 478 Q 165 486 138 478 Z" fill="#ffffff" stroke-width="4" />
+
+    <rect x="216" y="408" width="32" height="50" rx="8" fill="#ffffff" stroke-width="4" />
+    <line x1="216" y1="425" x2="248" y2="425" stroke-width="2" />
+    <line x1="216" y1="440" x2="248" y2="440" stroke-width="2" />
+    <path d="M 206 458 Q 231 448 256 458 L 258 478 Q 231 486 204 478 Z" fill="#ffffff" stroke-width="4" />
+
+    <!-- Floor line and gear -->
+    <line x1="40" y1="485" x2="360" y2="485" stroke-width="4" />
+    <!-- Gear on floor -->
+    <circle cx="90" cy="515" r="20" fill="#ffffff" stroke-width="3" />
+    <circle cx="90" cy="515" r="8" fill="#ffffff" stroke-width="3" />
+    <path d="M 90 490 L 90 540 M 65 515 L 115 515 M 72 497 L 108 533 M 72 533 L 108 497" stroke-width="3" />
+  </g>
+</svg>

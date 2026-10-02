@@ -1,0 +1,73 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 560" width="100%" height="100%">
+  <!-- Background border -->
+  <rect width="400" height="560" rx="16" fill="#ffffff" stroke="#1f2937" stroke-width="4"/>
+
+  <!-- Sun in sky -->
+  <g fill="#ffffff" stroke="#1f2937" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="70" cy="70" r="28" fill="#ffffff" stroke-width="4" />
+    <!-- Sun rays -->
+    <line x1="70" y1="30" x2="70" y2="20" stroke-width="4" />
+    <line x1="70" y1="110" x2="70" y2="120" stroke-width="4" />
+    <line x1="30" y1="70" x2="20" y2="70" stroke-width="4" />
+    <line x1="110" y1="70" x2="120" y2="70" stroke-width="4" />
+    <line x1="42" y1="42" x2="35" y2="35" stroke-width="4" />
+    <line x1="98" y1="98" x2="105" y2="105" stroke-width="4" />
+    <line x1="42" y1="98" x2="35" y2="105" stroke-width="4" />
+    <line x1="98" y1="42" x2="105" y2="35" stroke-width="4" />
+    <!-- Smiling sun face -->
+    <circle cx="62" cy="66" r="3" fill="#1f2937" />
+    <circle cx="78" cy="66" r="3" fill="#1f2937" />
+    <path d="M 64 78 Q 70 84 76 78" fill="none" stroke-width="3" />
+
+    <!-- Clouds -->
+    <path d="M 260 80 Q 280 60 305 75 Q 330 65 345 85 Q 360 100 340 115 Q 320 120 280 115 Q 250 110 260 80 Z" fill="#ffffff" stroke-width="3" />
+    <path d="M 150 95 Q 165 80 185 90 Q 200 85 210 100 Q 200 115 170 115 Q 145 110 150 95 Z" fill="#ffffff" stroke-width="3" />
+
+    <!-- Leaping Dolphin -->
+    <path d="M 120 270 C 130 190 200 140 270 170 C 310 190 340 230 330 270 C 320 285 300 270 285 260 C 255 240 215 245 180 270 C 150 290 125 315 105 350 C 95 365 85 360 80 345 C 80 320 105 285 120 270 Z" fill="#ffffff" stroke-width="4" />
+    <!-- Snout / Nose -->
+    <path d="M 270 170 C 290 165 310 170 315 180 C 300 188 285 190 270 190" fill="#ffffff" stroke-width="3" />
+    <!-- Dolphin eye -->
+    <circle cx="260" cy="188" r="5" fill="#1f2937" />
+    <circle cx="258" cy="186" r="1.5" fill="#ffffff" />
+    <!-- Smile -->
+    <path d="M 272 195 Q 280 200 288 194" fill="none" stroke-width="3" />
+    <!-- Dorsal fin -->
+    <path d="M 215 155 C 220 125 245 130 250 162" fill="#ffffff" stroke-width="4" />
+    <!-- Flipper -->
+    <path d="M 230 220 C 225 250 200 265 195 245 C 205 230 215 225 230 220 Z" fill="#ffffff" stroke-width="4" />
+    <!-- Tail Fluke -->
+    <path d="M 80 345 C 60 335 45 350 55 370 C 70 365 85 350 85 350 C 85 350 88 370 105 375 C 110 355 95 340 80 345 Z" fill="#ffffff" stroke-width="4" />
+    <!-- Belly line -->
+    <path d="M 270 200 C 240 220 190 260 140 315" fill="none" stroke-width="2.5" stroke-dasharray="4 4" />
+
+    <!-- Splash and water bubbles -->
+    <circle cx="115" cy="380" r="10" fill="#ffffff" stroke-width="3" />
+    <circle cx="135" cy="360" r="7" fill="#ffffff" stroke-width="3" />
+    <circle cx="95" cy="395" r="5" fill="#ffffff" stroke-width="2" />
+    <circle cx="150" cy="340" r="6" fill="#ffffff" stroke-width="3" />
+
+    <!-- Cute baby sea turtle swimming -->
+    <ellipse cx="290" cy="380" rx="25" ry="18" fill="#ffffff" stroke-width="3" />
+    <!-- Turtle shell patterns -->
+    <circle cx="290" cy="380" r="10" fill="#ffffff" stroke-width="2" />
+    <circle cx="320" cy="375" r="8" fill="#ffffff" stroke-width="3" />
+    <circle cx="323" cy="373" r="2" fill="#1f2937" />
+    <path d="M 275 365 Q 260 355 255 365 Q 268 375 275 372" fill="#ffffff" stroke-width="3" />
+    <path d="M 305 365 Q 315 350 325 355 Q 320 368 305 370" fill="#ffffff" stroke-width="3" />
+    <path d="M 275 390 Q 262 398 260 408 Q 272 402 278 393" fill="#ffffff" stroke-width="3" />
+
+    <!-- Ocean waves -->
+    <path d="M 20 420 Q 60 395 100 420 T 180 420 T 260 420 T 340 420 T 380 420" fill="none" stroke-width="4" />
+    <path d="M 20 455 Q 60 435 100 455 T 180 455 T 260 455 T 340 455 T 380 455" fill="none" stroke-width="3" />
+
+    <!-- Ocean floor and coral reef -->
+    <path d="M 20 535 Q 100 515 200 530 T 380 520 L 380 545 L 20 545 Z" fill="#ffffff" stroke-width="3" />
+    <!-- Seaweed / Corals -->
+    <path d="M 50 530 Q 35 480 55 450 Q 70 480 60 530" fill="#ffffff" stroke-width="3" />
+    <path d="M 70 530 Q 85 470 70 440 Q 95 480 80 530" fill="#ffffff" stroke-width="3" />
+    <path d="M 340 525 Q 360 480 345 445 Q 330 480 345 525" fill="#ffffff" stroke-width="3" />
+    <!-- Sea star -->
+    <path d="M 140 525 L 145 515 L 155 515 L 148 522 L 151 532 L 142 526 L 133 532 L 136 522 L 129 515 L 139 515 Z" fill="#ffffff" stroke-width="2.5" />
+  </g>
+</svg>
