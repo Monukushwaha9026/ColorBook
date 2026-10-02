@@ -8,12 +8,12 @@ export class HuggingFaceImageProvider implements ImageProvider {
   private model: string;
 
   constructor(apiKey?: string, model?: string) {
-    this.apiKey = apiKey || process.env.HUGGINGFACE_API_KEY?.trim();
-    this.model = model || process.env.HUGGINGFACE_MODEL?.trim() || 'black-forest-labs/FLUX.1-schnell';
+    this.apiKey = apiKey !== undefined ? apiKey : process.env.HUGGINGFACE_API_KEY?.trim();
+    this.model = model !== undefined ? model : process.env.HUGGINGFACE_MODEL?.trim() || 'black-forest-labs/FLUX.1-schnell';
   }
 
   async generateImage(input: ImageGenerationInput): Promise<GeneratedImage> {
-    const apiKey = this.apiKey || process.env.HUGGINGFACE_API_KEY?.trim();
+    const apiKey = this.apiKey !== undefined ? this.apiKey : process.env.HUGGINGFACE_API_KEY?.trim();
     if (!apiKey || apiKey === 'your_huggingface_api_key_here') {
       throw new AppError(
         'Hugging Face API key is not configured. Please set HUGGINGFACE_API_KEY in your environment or .env file.',
@@ -29,7 +29,8 @@ export class HuggingFaceImageProvider implements ImageProvider {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 60000); // 60s timeout
 
-    const endpoint = `https://api-inference.huggingface.co/models/${encodeURIComponent(this.model)}`;
+    // Hugging Face router inference endpoint
+    const endpoint = `https://router.huggingface.co/hf-inference/models/${encodeURIComponent(this.model)}`;
 
     console.log(`[HuggingFaceImageProvider] Requesting image from model: ${this.model} (Seed: ${seed})`);
 
@@ -58,6 +59,29 @@ export class HuggingFaceImageProvider implements ImageProvider {
           'Hugging Face authentication failed: invalid or expired API key. Please verify your HUGGINGFACE_API_KEY.',
           401,
           'HUGGINGFACE_AUTH_ERROR'
+        );
+      }
+
+      if (response.status === 410) {
+        throw new AppError(
+          `Hugging Face model "${this.model}" is no longer supported on the free serverless Inference API (HTTP 410: Deprecated by provider). Hugging Face requires a dedicated Inference Endpoint or third-party inference provider for FLUX/SDXL diffusion models.`,
+          410,
+          'HUGGINGFACE_MODEL_DEPRECATED'
+        );
+      }
+
+      if (response.status === 400) {
+        let errDetail = 'Model not supported by provider hf-inference.';
+        try {
+          const errJson = (await response.json()) as { error?: string };
+          if (errJson.error) errDetail = errJson.error;
+        } catch {
+          // ignore
+        }
+        throw new AppError(
+          `Hugging Face model "${this.model}" is not available on free serverless inference: ${errDetail}. Hugging Face now routes diffusion models through dedicated or partner inference endpoints.`,
+          400,
+          'HUGGINGFACE_MODEL_UNSUPPORTED'
         );
       }
 
