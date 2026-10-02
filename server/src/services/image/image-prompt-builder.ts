@@ -14,9 +14,9 @@ export class ImagePromptBuilder {
     const safetyReplacements: Array<[RegExp, string]> = [
       [/\b(blood|bloody|gore|gory|bleeding)\b/gi, 'playful colors'],
       [/\b(murder|kill|killing|slaughter|decapitate|dismember|sever|severed|behead|beheading)\b/gi, 'playfully surprise'],
+      [/\b(attack|attacking|attacked|assault|violent|violence|weapon|gun|knife|stab|terror)\b/gi, 'playing with'],
       [/\b(corpse|dead body|rotting)\b/gi, 'vintage mystery'],
-      [/\b(zombie eating|cannibal|flesh)\b/gi, 'friendly cartoon monster enjoying snacks'],
-      [/\b(violent|violence|assault|weapon|gun|knife|stab|terror)\b/gi, 'adventure'],
+      [/\b(scary zombie|zombie eating|zombie|cannibal|flesh|undead)\b/gi, 'friendly playful character'],
       [/\b(nude|naked|erotic|sexual|nsfw|sensual)\b/gi, 'clothed cartoon character'],
       [/\b(hate|racist|extremist|terrorist)\b/gi, 'friendly hero'],
     ];

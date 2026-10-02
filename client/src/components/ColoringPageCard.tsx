@@ -89,7 +89,7 @@ export const ColoringPageCard: React.FC<ColoringPageCardProps> = ({
               Generation failed
             </span>
             <p className="text-[11px] text-rose-600 font-medium line-clamp-2 px-1 mb-3">
-              We couldn&apos;t create this page.
+              We couldn&apos;t generate this page.
             </p>
             <button
               type="button"

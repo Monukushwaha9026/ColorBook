@@ -7,6 +7,7 @@ import { pageRouter, standalonePageRouter } from './routes/page.routes.js';
 import { healthRouter } from './routes/health.routes.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import { imageStorage } from './services/storage/local-image-storage.js';
+import { ImageProviderService } from './services/image/image-provider.service.js';
 
 dotenv.config();
 dotenv.config({ path: path.resolve(process.cwd(), '../.env') });
@@ -41,4 +42,5 @@ app.use(errorHandler);
 app.listen(PORT, () => {
   console.log(`🚀 ColorBook AI Server listening on http://localhost:${PORT}`);
   console.log(`📡 Health check: http://localhost:${PORT}/api/health`);
+  ImageProviderService.validateConfiguration();
 });

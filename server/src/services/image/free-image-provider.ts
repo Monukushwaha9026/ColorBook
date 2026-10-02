@@ -3,45 +3,24 @@ import type { ImageProvider, ImageGenerationInput, GeneratedImage } from './imag
 import { ImagePromptBuilder } from './image-prompt-builder.js';
 import { ImageValidator } from './image-validator.js';
 
-export class FreeImageProvider implements ImageProvider {
-  readonly name = 'free';
+/**
+ * TEST / DEVELOPMENT FALLBACK
+ * 
+ * Deterministic synthetic line-art generator strictly intended for:
+ * - Automated test suites
+ * - Continuous Integration (CI)
+ * - Provider-unavailable architecture testing
+ * 
+ * This must NOT be presented in the UI as real AI image generation.
+ */
+export class TestImageProvider implements ImageProvider {
+  readonly name = 'test';
 
   async generateImage(input: ImageGenerationInput): Promise<GeneratedImage> {
-    const positivePrompt = ImagePromptBuilder.buildPrompt(input);
     const seed = input.variationSeed || Math.floor(Math.random() * 1000000);
-
-    // 1. Attempt free public AI endpoint (e.g. Pollinations free line-art generation)
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 20000); // 20s timeout
-
-      const cleanPrompt = `coloring book page, pure black lines, white background, ${input.concept}, line art, no color, no shading, printable`;
-      const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(cleanPrompt)}?width=768&height=1024&nologo=true&seed=${seed}&model=flux`;
-
-      const res = await fetch(url, { signal: controller.signal });
-      clearTimeout(timeoutId);
-
-      if (res.ok) {
-        const arrayBuf = await res.arrayBuffer();
-        const buffer = Buffer.from(arrayBuf);
-        const validation = ImageValidator.validate(buffer);
-        if (validation.valid) {
-          return {
-            buffer,
-            mimeType: 'image/png',
-            width: validation.width || 768,
-            height: validation.height || 1024,
-          };
-        }
-      }
-    } catch {
-      // Fallback to local deterministic generator if network is offline or external API times out
-    }
-
-    // 2. Offline / resilient fallback: Synthesize a high-quality line-art coloring page
-    const fallbackBuffer = this.generateFallbackColoringArt(input, seed);
+    const buffer = this.generateFallbackColoringArt(input, seed);
     return {
-      buffer: fallbackBuffer,
+      buffer,
       mimeType: 'image/png',
       width: 768,
       height: 1024,
@@ -272,3 +251,7 @@ export class FreeImageProvider implements ImageProvider {
     return Buffer.concat([sig, ihdrChunk, idatChunk, iendChunk]);
   }
 }
+
+// Backward compatibility alias for existing imports
+export { TestImageProvider as FreeImageProvider };
+

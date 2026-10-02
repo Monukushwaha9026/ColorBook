@@ -61,7 +61,8 @@ export class LocalImageProvider implements ImageProvider {
         );
       }
 
-      const buffer = Buffer.from(rawBase64, 'base64');
+      const cleanBase64 = rawBase64.replace(/^data:image\/\w+;base64,/, '');
+      const buffer = Buffer.from(cleanBase64, 'base64');
       return {
         buffer,
         mimeType: 'image/png',

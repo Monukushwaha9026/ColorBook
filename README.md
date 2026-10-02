@@ -239,8 +239,10 @@ FRONTEND PREVIEW & INDIVIDUAL REGENERATION
 ```
 
 ### 1. Replaceable Image Provider System
-- **Local Provider (`IMAGE_PROVIDER=local`)**: Connects to local Stable Diffusion WebUI / SD.Next / ComfyUI API (`http://localhost:7860`). Returns a friendly controlled error (`LOCAL_IMAGE_PROVIDER_UNAVAILABLE`) if the local server is offline without crashing the app.
-- **Free Provider (`IMAGE_PROVIDER=free`)**: Works 100% out of the box with zero external setup, using public endpoints with deterministic local vector/raster line-art synthesis as a robust $0 development engine.
+- **Local Provider (`IMAGE_PROVIDER=local`)**: Connects to local Stable Diffusion WebUI / SD.Next / Forge API (`http://localhost:7860/sdapi/v1/txt2img`). Returns a controlled error (`LOCAL_IMAGE_PROVIDER_UNAVAILABLE`) if the local server is offline without crashing the app.
+- **Hugging Face Cloud Provider (`IMAGE_PROVIDER=huggingface`)**: Connects to Hugging Face Inference API (`black-forest-labs/FLUX.1-schnell` or custom `HUGGINGFACE_MODEL`). Returns controlled errors (`HUGGINGFACE_CONFIG_ERROR`, `HUGGINGFACE_AUTH_ERROR`) when credentials are missing or invalid. Note: free cloud usage is subject to provider rate limits.
+- **Test Provider (`IMAGE_PROVIDER=test`)**: Deterministic synthetic line-art generator strictly for automated tests, CI, and architecture verification. Clearly marked as **TEST / DEVELOPMENT FALLBACK** and never presented as genuine AI generation.
+- **No Silent Fallback**: If a real provider (`local` or `huggingface`) fails, the system marks the page as failed and prompts the user to retry—it never silently substitutes synthetic artwork.
 - **Image Prompt Builder**: Injects age-calibrated linework rules (thick outlines for 3–6, medium for 7–10, fine for 11–13, intricate for 14–17), strict pure B&W technical constraints, negative cues, and family-friendly safety filtering.
 - **Quality & Safety Validation**: Every generated image is verified for binary format integrity (PNG/JPEG/WebP/SVG), minimum dimensions (>= 512px), non-empty buffers, and clean linework before being accepted.
 - **Automatic Retry Loop**: Up to 3 attempts with dynamic seeds and parameter variation before failing a page.
@@ -274,9 +276,18 @@ DATABASE_URL="postgresql://postgres:postgres@localhost:5432/colorbook_ai?schema=
 GEMINI_TEXT_MODEL=gemini-2.5-flash-lite
 GEMINI_API_KEY=your_gemini_api_key_here
 
-# Image Generation Provider ('local' or 'free')
+# Image Provider ('local' | 'huggingface' | 'test')
 IMAGE_PROVIDER=local
+
+# Local Stable Diffusion-compatible API
 LOCAL_IMAGE_API_URL=http://localhost:7860
+
+# Hugging Face Cloud Inference
+HUGGINGFACE_API_KEY=
+HUGGINGFACE_MODEL=black-forest-labs/FLUX.1-schnell
+
+# Test provider (Deterministic synthetic fallback for CI/testing)
+# IMAGE_PROVIDER=test
 
 # Image Storage
 IMAGE_STORAGE=local
@@ -306,18 +317,16 @@ MAX_IMAGE_GENERATION_ATTEMPTS=3
 
 ---
 
-## 🧪 Automated Test Suite
+## 🧪 Automated Test Suites
 
-Run the full 63-step test suite covering prompt generation, image validation, retries, offline handling, storage, orchestration, regeneration, deletion, and cancellation:
+1. **Complete Engine & Architecture Test Matrix** (73 tests):
+   ```bash
+   npx tsx server/test-engine.ts
+   ```
 
-```bash
-npx tsx server/test-engine.ts
-```
-
-All 63 tests pass cleanly.
-
----
-
+2. **Real Image Generation & SD Protocol Test**:
+   ```bash
+   npx tsx server/test-real-image.ts
 ## 🔮 Next Step (Step 2 Preview)
 
 - Implement printable PDF generation (A4 and US Letter sizes, Portrait and Landscape orientations)

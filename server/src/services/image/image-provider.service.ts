@@ -1,6 +1,7 @@
 import type { ImageProvider, ImageGenerationInput, GeneratedImage } from './image-provider.interface.js';
 import { LocalImageProvider } from './local-image-provider.js';
-import { FreeImageProvider } from './free-image-provider.js';
+import { HuggingFaceImageProvider } from './huggingface-image-provider.js';
+import { TestImageProvider } from './free-image-provider.js';
 import { ImageValidator, type ImageValidationResult } from './image-validator.js';
 import { AppError } from '../../middleware/errorHandler.js';
 
@@ -19,12 +20,64 @@ export class ImageProviderService {
   }
 
   static refreshProvider(): void {
-    const providerName = (process.env.IMAGE_PROVIDER || 'local').toLowerCase();
-    if (providerName === 'free') {
-      this.provider = new FreeImageProvider();
+    const providerName = (process.env.IMAGE_PROVIDER || 'local').toLowerCase().trim();
+    if (providerName === 'huggingface') {
+      this.provider = new HuggingFaceImageProvider();
+    } else if (providerName === 'test' || providerName === 'free') {
+      this.provider = new TestImageProvider();
     } else {
       this.provider = new LocalImageProvider();
     }
+  }
+
+  static validateConfiguration(): { provider: string; status: 'ok' | 'warning' | 'error'; message: string } {
+    const providerName = (process.env.IMAGE_PROVIDER || 'local').toLowerCase().trim();
+
+    if (providerName === 'local') {
+      const apiUrl = process.env.LOCAL_IMAGE_API_URL || 'http://localhost:7860';
+      console.log(`[ImageProviderService] Provider: 'local' (Target: ${apiUrl})`);
+      return {
+        provider: 'local',
+        status: 'ok',
+        message: `Local Stable Diffusion API configured at ${apiUrl}`,
+      };
+    }
+
+    if (providerName === 'huggingface') {
+      const apiKey = process.env.HUGGINGFACE_API_KEY?.trim();
+      const model = process.env.HUGGINGFACE_MODEL?.trim() || 'black-forest-labs/FLUX.1-schnell';
+      if (!apiKey || apiKey === 'your_huggingface_api_key_here') {
+        const warning = `[ImageProviderService] Warning: IMAGE_PROVIDER='huggingface' but HUGGINGFACE_API_KEY is not configured in .env.`;
+        console.warn(warning);
+        return {
+          provider: 'huggingface',
+          status: 'warning',
+          message: 'Hugging Face API key is missing. Set HUGGINGFACE_API_KEY in .env before generating images.',
+        };
+      }
+      console.log(`[ImageProviderService] Provider: 'huggingface' (Model: ${model})`);
+      return {
+        provider: 'huggingface',
+        status: 'ok',
+        message: `Hugging Face Inference API configured with model ${model}`,
+      };
+    }
+
+    if (providerName === 'test' || providerName === 'free') {
+      console.log(`[ImageProviderService] Provider: 'test' (TEST / DEVELOPMENT FALLBACK - synthetic line art)`);
+      return {
+        provider: 'test',
+        status: 'ok',
+        message: 'Synthetic test provider active for automated tests / local dev.',
+      };
+    }
+
+    console.warn(`[ImageProviderService] Unknown provider '${providerName}'. Defaulting to 'local'.`);
+    return {
+      provider: providerName,
+      status: 'warning',
+      message: `Unrecognized provider '${providerName}'. Using local provider fallback.`,
+    };
   }
 
   static setProvider(customProvider: ImageProvider): void {
@@ -74,13 +127,15 @@ export class ImageProviderService {
           break;
         }
       } catch (err: unknown) {
-        if (err instanceof AppError && err.code === 'LOCAL_IMAGE_PROVIDER_UNAVAILABLE') {
-          // If local server is not running and user configured local, let the controlled error bubble up
-          // or try FreeImageProvider fallback if allowed
-          console.warn(`[ImageProviderService] Local provider unavailable on attempt ${attempts}: ${err.message}`);
-          if (attempts >= maxAttempts) {
-            throw err;
-          }
+        if (
+          err instanceof AppError &&
+          (err.code === 'LOCAL_IMAGE_PROVIDER_UNAVAILABLE' ||
+            err.code === 'HUGGINGFACE_AUTH_ERROR' ||
+            err.code === 'HUGGINGFACE_CONFIG_ERROR' ||
+            err.code === 'HUGGINGFACE_MODEL_NOT_FOUND')
+        ) {
+          console.warn(`[ImageProviderService] Provider error: ${err.message}`);
+          throw err;
         } else {
           const msg = err instanceof Error ? err.message : String(err);
           failureReasons.push(`Attempt ${attempts} error: ${msg}`);

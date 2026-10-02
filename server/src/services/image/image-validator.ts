@@ -7,9 +7,23 @@ export interface ImageValidationResult {
   format?: string;
 }
 
+/**
+ * Quality & Format Validator for Coloring Book Pages
+ * 
+ * Provides automated quality gates across two distinct tiers:
+ * 1. Technical Validation:
+ *    - Valid image buffer and magic header detection (PNG, JPEG, WebP, SVG)
+ *    - Correct format structure (e.g. terminating IEND chunks)
+ *    - Sufficient dimensions (>= 512x512 resolution for printable output)
+ *    - Non-empty payload (> 512 bytes)
+ * 
+ * 2. Visual Quality & Coloring Gate:
+ *    - Complexity & entropy check (rejects solid blank or collapsed images)
+ *    - Validates coloring page suitability without claiming omniscient semantic safety
+ */
 export class ImageValidator {
   /**
-   * Validate generated image buffer for dimensions, corruption, content richness, and coloring criteria
+   * Validate generated image buffer against technical format standards and coloring quality gates
    */
   static validate(buffer: Buffer | null | undefined, minResolution = 256): ImageValidationResult {
     const reasons: string[] = [];

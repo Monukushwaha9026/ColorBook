@@ -10,7 +10,8 @@ dotenv.config({ path: path.resolve(process.cwd(), '.env') });
 import { ImagePromptBuilder } from './src/services/image/image-prompt-builder.js';
 import { ImageValidator } from './src/services/image/image-validator.js';
 import { LocalImageProvider } from './src/services/image/local-image-provider.js';
-import { FreeImageProvider } from './src/services/image/free-image-provider.js';
+import { HuggingFaceImageProvider } from './src/services/image/huggingface-image-provider.js';
+import { TestImageProvider, FreeImageProvider } from './src/services/image/free-image-provider.js';
 import { ImageProviderService } from './src/services/image/image-provider.service.js';
 import { imageStorage } from './src/services/storage/local-image-storage.js';
 import { BookService } from './src/services/book.service.js';
@@ -87,12 +88,29 @@ async function runTestSuite() {
   assert(!safePrompt.prompt.toLowerCase().includes('violence'), 'Sanitization removes "violence"');
   assert(safePrompt.prompt.includes('friendly') || safePrompt.prompt.includes('playful'), 'Unsafe words sanitized to friendly/playful terms');
 
+  // Test Section 11 specific prompt: "A scary zombie covered in blood attacking someone"
+  const zombieConcept = 'A scary zombie covered in blood attacking someone';
+  const safeZombiePrompt = ImagePromptBuilder.build({
+    theme: 'Spooky adventure',
+    concept: zombieConcept,
+    ageGroup: 'children',
+    pageNumber: 3,
+  });
+
+  const zombieLower = safeZombiePrompt.prompt.toLowerCase();
+  assert(!zombieLower.includes('zombie'), 'Sanitization removes "zombie" from "A scary zombie covered in blood attacking someone"');
+  assert(!zombieLower.includes('blood'), 'Sanitization removes "blood"');
+  assert(!zombieLower.includes('attacking'), 'Sanitization removes "attacking"');
+  assert(zombieLower.includes('friendly') || zombieLower.includes('playful'), 'Unsafe zombie prompt converted to friendly playful coloring scene');
+
   // ---------------------------------------------------------------------------
-  // TEST 3: FreeImageProvider Line Art Generation
+  // TEST 3: TestImageProvider (TEST / DEVELOPMENT FALLBACK)
   // ---------------------------------------------------------------------------
-  console.log('\n[3/12] Testing FreeImageProvider Generation...');
-  const freeProvider = new FreeImageProvider();
-  const genResult = await freeProvider.generateImage({
+  console.log('\n[3/12] Testing TestImageProvider (TEST / DEVELOPMENT FALLBACK)...');
+  const testProvider = new TestImageProvider();
+  assert(testProvider.name === 'test', 'TestImageProvider name is "test"');
+
+  const genResult = await testProvider.generateImage({
     bookId: 'test-book',
     pageNumber: 1,
     theme: 'Ocean underwater',
@@ -192,8 +210,8 @@ async function runTestSuite() {
   assert(alwaysFailCount === 3, `Tried exactly 3 attempts before aborting (got ${alwaysFailCount})`);
   assert(caughtError?.code === 'IMAGE_GENERATION_FAILED', `Error code is IMAGE_GENERATION_FAILED (${caughtError?.code})`);
 
-  // Switch to FreeImageProvider for remaining tests
-  ImageProviderService.setProvider(freeProvider);
+  // Switch to TestImageProvider for remaining tests
+  ImageProviderService.setProvider(testProvider);
 
   // ---------------------------------------------------------------------------
   // TEST 6: Local Provider Offline Graceful Error
@@ -217,6 +235,48 @@ async function runTestSuite() {
   assert(offlineError !== null, 'Offline local provider throws error');
   assert(offlineError?.code === 'LOCAL_IMAGE_PROVIDER_UNAVAILABLE', `Error code is LOCAL_IMAGE_PROVIDER_UNAVAILABLE (${offlineError?.code})`);
   assert(offlineError?.message.includes('unavailable') || offlineError?.message.includes('local AI service'), 'Error message provides actionable local setup guidance');
+
+  // ---------------------------------------------------------------------------
+  // TEST 6B: Hugging Face Provider Adapter & Missing Key Error
+  // ---------------------------------------------------------------------------
+  console.log('\n[6B] Testing Hugging Face Provider Missing Key Handling...');
+  const hfNoKeyProvider = new HuggingFaceImageProvider('');
+  let hfConfigError: AppError | null = null;
+  try {
+    await hfNoKeyProvider.generateImage({
+      bookId: 'hf-test',
+      pageNumber: 1,
+      theme: 'Space',
+      concept: 'Astronaut on Mars',
+      ageGroup: 'children',
+    });
+  } catch (err) {
+    hfConfigError = err as AppError;
+  }
+  assert(hfConfigError !== null, 'Hugging Face without API key throws configuration error');
+  assert(hfConfigError?.code === 'HUGGINGFACE_CONFIG_ERROR', `Error code is HUGGINGFACE_CONFIG_ERROR (${hfConfigError?.code})`);
+
+  // ---------------------------------------------------------------------------
+  // TEST 6C: ImageProviderService Configuration Validation
+  // ---------------------------------------------------------------------------
+  console.log('\n[6C] Testing Provider Configuration Validation...');
+  const originalProviderEnv = process.env.IMAGE_PROVIDER;
+
+  process.env.IMAGE_PROVIDER = 'local';
+  const localConfigCheck = ImageProviderService.validateConfiguration();
+  assert(localConfigCheck.provider === 'local', 'Config check validates local provider');
+
+  process.env.IMAGE_PROVIDER = 'test';
+  const testConfigCheck = ImageProviderService.validateConfiguration();
+  assert(testConfigCheck.provider === 'test', 'Config check validates test provider');
+
+  process.env.IMAGE_PROVIDER = 'huggingface';
+  const hfConfigCheck = ImageProviderService.validateConfiguration();
+  assert(hfConfigCheck.provider === 'huggingface', 'Config check validates huggingface provider');
+
+  // Restore env
+  process.env.IMAGE_PROVIDER = originalProviderEnv;
+
 
   // ---------------------------------------------------------------------------
   // TEST 7: Local Image Storage Service
