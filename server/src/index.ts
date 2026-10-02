@@ -6,6 +6,7 @@ import { bookRouter } from './routes/book.routes.js';
 import { pageRouter, standalonePageRouter } from './routes/page.routes.js';
 import { healthRouter } from './routes/health.routes.js';
 import { errorHandler } from './middleware/errorHandler.js';
+import { imageStorage } from './services/storage/local-image-storage.js';
 
 dotenv.config();
 dotenv.config({ path: path.resolve(process.cwd(), '../.env') });
@@ -23,6 +24,10 @@ app.use(
 
 app.use(express.json({ limit: '15mb' }));
 app.use(express.urlencoded({ extended: true, limit: '15mb' }));
+
+// Static file serving for stored coloring pages
+app.use('/storage/images', express.static(imageStorage.getBaseDir()));
+app.use('/api/storage/images', express.static(imageStorage.getBaseDir()));
 
 // API Routes
 app.use('/api', healthRouter);

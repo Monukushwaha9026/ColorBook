@@ -20,7 +20,7 @@ export interface ColoringPageItem {
   visualPrompt?: string;
   difficulty?: 'easy' | 'medium' | 'detailed' | 'intricate' | string;
   imageUrl?: string | null;
-  status?: 'pending' | 'planned' | 'generating' | 'completed' | 'failed';
+  status?: 'pending' | 'planned' | 'generating' | 'completed' | 'failed' | 'deleted';
   isRegenerating?: boolean;
 }
 
@@ -37,6 +37,7 @@ export interface Book {
   prompt: string;
   ageGroup: AgeGroupId;
   pageCount: number;
+  completedPages?: number;
   status: BookStatus;
   pages: ColoringPageItem[];
   paperSize?: PaperSize;

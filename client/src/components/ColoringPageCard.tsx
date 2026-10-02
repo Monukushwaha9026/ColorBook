@@ -1,5 +1,5 @@
 import React from 'react';
-import { RefreshCw, Trash2, Eye, Sparkles, Loader2, Code2 } from 'lucide-react';
+import { RefreshCw, Trash2, Eye, Sparkles, Loader2, Code2, AlertTriangle, Clock } from 'lucide-react';
 import type { ColoringPageItem } from '../types';
 
 interface ColoringPageCardProps {
@@ -17,6 +17,11 @@ export const ColoringPageCard: React.FC<ColoringPageCardProps> = ({
   onView,
   isOnlyPage = false,
 }) => {
+  const isGenerating = page.status === 'generating' || page.isRegenerating;
+  const isFailed = page.status === 'failed';
+  const isCompleted = page.status === 'completed' && Boolean(page.imageUrl);
+  const isPlanned = page.status === 'planned' || (!isCompleted && !isFailed && !isGenerating);
+
   const getDifficultyBadge = (difficulty?: string) => {
     switch (difficulty?.toLowerCase()) {
       case 'easy':
@@ -41,7 +46,7 @@ export const ColoringPageCard: React.FC<ColoringPageCardProps> = ({
         };
       default:
         return {
-          label: difficulty || 'Planned',
+          label: difficulty || 'Standard',
           classes: 'bg-slate-100 text-slate-700 border-slate-200',
         };
     }
@@ -50,27 +55,86 @@ export const ColoringPageCard: React.FC<ColoringPageCardProps> = ({
   const difficultyInfo = getDifficultyBadge(page.difficulty);
 
   return (
-    <div className="group relative flex flex-col rounded-2xl border-2 border-slate-200/90 bg-white overflow-hidden shadow-2xs hover:shadow-card-hover hover:border-purple-300 transition-all duration-200">
-      {/* Page Display Area (Line art or Step 3 Planned Placeholder) */}
+    <div className={`group relative flex flex-col rounded-2xl border-2 bg-white overflow-hidden shadow-2xs transition-all duration-200 ${
+      isFailed
+        ? 'border-rose-200 hover:border-rose-300'
+        : isGenerating
+        ? 'border-purple-300 shadow-purple-500/10'
+        : 'border-slate-200/90 hover:shadow-card-hover hover:border-purple-300'
+    }`}>
+      {/* Page Display Area */}
       <div className="relative aspect-3/4 w-full bg-slate-50/50 flex items-center justify-center p-3 border-b border-slate-100 overflow-hidden">
-        {page.imageUrl ? (
-          <img
-            src={page.imageUrl}
-            alt={page.title}
-            className={`w-full h-full object-contain filter contrast-125 transition-transform duration-300 group-hover:scale-102 ${
-              page.isRegenerating ? 'opacity-30 blur-2xs' : 'opacity-100'
-            }`}
-            loading="lazy"
-          />
-        ) : (
-          /* Step 3: Planned Page Concept Card with "Artwork coming next" */
+        {/* State 1: Active Generation in Progress */}
+        {isGenerating && (
+          <div className="w-full h-full flex flex-col items-center justify-center p-4 text-center bg-radial from-purple-50 via-white to-slate-50">
+            <div className="relative w-14 h-14 rounded-2xl bg-purple-100 flex items-center justify-center text-purple-600 mb-3 shadow-xs">
+              <Loader2 className="w-7 h-7 text-purple-600 animate-spin" />
+            </div>
+            <span className="text-xs font-bold text-purple-900 bg-purple-100/90 px-2.5 py-1 rounded-full mb-1">
+              Generating artwork…
+            </span>
+            <p className="text-[11px] text-slate-500 line-clamp-2 px-1">
+              {page.concept || 'Drawing black-and-white coloring lines'}
+            </p>
+          </div>
+        )}
+
+        {/* State 2: Generation Failed */}
+        {!isGenerating && isFailed && (
+          <div className="w-full h-full flex flex-col items-center justify-center p-4 text-center bg-rose-50/60 rounded-xl border border-rose-200/80">
+            <div className="w-12 h-12 rounded-2xl bg-rose-100 text-rose-600 flex items-center justify-center mb-2.5 shadow-2xs">
+              <AlertTriangle className="w-6 h-6" />
+            </div>
+            <span className="text-xs font-bold text-rose-800 bg-rose-100 px-2.5 py-0.5 rounded-full mb-1">
+              Generation failed
+            </span>
+            <p className="text-[11px] text-rose-600 font-medium line-clamp-2 px-1 mb-3">
+              We couldn&apos;t create this page.
+            </p>
+            <button
+              type="button"
+              onClick={() => onRegenerate(page.pageNumber)}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white border border-rose-200 text-rose-700 text-xs font-bold hover:bg-rose-50 shadow-2xs transition-colors cursor-pointer"
+            >
+              <RefreshCw className="w-3.5 h-3.5" />
+              <span>Try again</span>
+            </button>
+          </div>
+        )}
+
+        {/* State 3: Completed Artwork */}
+        {!isGenerating && !isFailed && isCompleted && page.imageUrl && (
+          <>
+            <img
+              src={page.imageUrl}
+              alt={page.title}
+              className="w-full h-full object-contain filter contrast-125 transition-transform duration-300 group-hover:scale-102"
+              loading="lazy"
+            />
+            {/* Hover Action Overlay: View Full Details */}
+            <div className="absolute inset-0 bg-purple-900/10 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none z-10">
+              <button
+                type="button"
+                onClick={() => onView(page)}
+                className="pointer-events-auto inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-white/95 text-slate-800 text-xs font-bold shadow-md hover:bg-white hover:text-purple-600 cursor-pointer transform translate-y-2 group-hover:translate-y-0 transition-all border border-slate-200/70"
+              >
+                <Eye className="w-3.5 h-3.5" />
+                <span>Preview Artwork</span>
+              </button>
+            </div>
+          </>
+        )}
+
+        {/* State 4: Planned / Waiting in Queue */}
+        {!isGenerating && !isFailed && isPlanned && (
           <div className="w-full h-full flex flex-col items-center justify-center p-3 text-center bg-radial from-purple-50/70 via-white to-slate-50 border-2 border-dashed border-purple-200/90 rounded-xl transition-all group-hover:border-purple-300">
             <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-purple-600 to-indigo-500 text-white flex items-center justify-center mb-2.5 shadow-sm group-hover:scale-105 transition-transform">
               <Sparkles className="w-6 h-6 text-purple-100" />
             </div>
 
             <span className="inline-flex items-center gap-1 text-[11px] font-extrabold uppercase tracking-wider text-purple-700 bg-purple-100/80 px-2.5 py-0.5 rounded-full mb-2 border border-purple-200">
-              Artwork coming next
+              <Clock className="w-3 h-3" />
+              Waiting in queue
             </span>
 
             <p className="text-[11px] text-slate-600 font-medium line-clamp-3 px-1 leading-relaxed">
@@ -78,28 +142,6 @@ export const ColoringPageCard: React.FC<ColoringPageCardProps> = ({
             </p>
           </div>
         )}
-
-        {/* Regenerating Spinner Overlay */}
-        {page.isRegenerating && (
-          <div className="absolute inset-0 bg-white/80 backdrop-blur-2xs flex flex-col items-center justify-center gap-2 z-20 animate-in fade-in duration-200">
-            <Loader2 className="w-8 h-8 text-purple-600 animate-spin" />
-            <span className="text-xs font-bold text-purple-900 bg-purple-100/80 px-2.5 py-1 rounded-full">
-              Updating concept…
-            </span>
-          </div>
-        )}
-
-        {/* Hover Action Overlay: View Full Details / Prompt */}
-        <div className="absolute inset-0 bg-purple-900/10 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none z-10">
-          <button
-            type="button"
-            onClick={() => onView(page)}
-            className="pointer-events-auto inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-white/95 text-slate-800 text-xs font-bold shadow-md hover:bg-white hover:text-purple-600 cursor-pointer transform translate-y-2 group-hover:translate-y-0 transition-all border border-slate-200/70"
-          >
-            <Eye className="w-3.5 h-3.5" />
-            <span>Inspect Concept</span>
-          </button>
-        </div>
 
         {/* Top Badges */}
         <div className="absolute top-2.5 left-2.5 z-10">
@@ -147,20 +189,18 @@ export const ColoringPageCard: React.FC<ColoringPageCardProps> = ({
         <div className="flex items-center justify-between pt-1.5 border-t border-slate-100">
           <button
             type="button"
-            disabled={page.isRegenerating}
+            disabled={isGenerating}
             onClick={() => onRegenerate(page.pageNumber)}
-            className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-semibold text-purple-700 hover:bg-purple-100/70 transition-colors cursor-pointer disabled:opacity-50"
-            title="Regenerate concept for this page"
+            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold text-purple-700 hover:bg-purple-100/70 transition-colors cursor-pointer disabled:opacity-50"
+            title="Regenerate artwork for this single page"
           >
-            <RefreshCw
-              className={`w-3.5 h-3.5 ${page.isRegenerating ? 'animate-spin' : ''}`}
-            />
-            <span>{page.isRegenerating ? 'Updating…' : 'Regenerate'}</span>
+            <RefreshCw className={`w-3.5 h-3.5 ${isGenerating ? 'animate-spin' : ''}`} />
+            <span>{isGenerating ? 'Drawing…' : 'Regenerate'}</span>
           </button>
 
           <button
             type="button"
-            disabled={isOnlyPage || page.isRegenerating}
+            disabled={isOnlyPage || isGenerating}
             onClick={() => onDelete(page.pageNumber)}
             className={`p-1.5 rounded-lg text-slate-400 transition-colors ${
               isOnlyPage

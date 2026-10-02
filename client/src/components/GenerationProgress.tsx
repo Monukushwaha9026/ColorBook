@@ -1,24 +1,29 @@
 import React from 'react';
-import { Check, Loader2, Sparkles, FastForward } from 'lucide-react';
+import { Check, Loader2, Sparkles, XCircle, FastForward } from 'lucide-react';
 
 interface GenerationProgressProps {
   currentPage: number;
   totalPages: number;
+  completedPages?: number;
   isPlanningDone: boolean;
   statusMessage?: string;
+  onCancel?: () => void;
   onSkip?: () => void;
 }
 
 export const GenerationProgress: React.FC<GenerationProgressProps> = ({
   currentPage,
   totalPages,
+  completedPages = 0,
   isPlanningDone,
   statusMessage,
+  onCancel,
   onSkip,
 }) => {
+  // If planning is done, progress represents real generation: 20% base + 80% * (completed / total)
   const percent = isPlanningDone
-    ? Math.min(100, Math.round(30 + (currentPage / totalPages) * 70))
-    : 20;
+    ? Math.min(100, Math.round(20 + (completedPages / totalPages) * 80))
+    : 15;
 
   return (
     <div className="w-full max-w-2xl mx-auto my-8 p-6 sm:p-8 rounded-3xl bg-white border border-purple-100 shadow-soft text-center animate-in fade-in zoom-in-95 duration-300">
@@ -32,21 +37,25 @@ export const GenerationProgress: React.FC<GenerationProgressProps> = ({
         <div>
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-purple-50 text-purple-700 text-xs font-bold border border-purple-200/80 mb-2">
             <Sparkles className="w-3.5 h-3.5" />
-            <span>Google Gemini AI Planner</span>
+            <span>AI Coloring Book Engine</span>
           </div>
           <h2 className="text-xl sm:text-2xl font-extrabold text-slate-900 tracking-tight">
-            {isPlanningDone ? 'Designing your coloring pages…' : 'Planning your coloring book…'}
+            {isPlanningDone
+              ? completedPages >= totalPages
+                ? 'Coloring book ready!'
+                : `Creating page ${Math.min(currentPage, totalPages)} of ${totalPages}`
+              : 'Planning your coloring book…'}
           </h2>
           <p className="text-sm text-slate-500 mt-1">
             {statusMessage ||
               (isPlanningDone
-                ? `Structuring page concept ${currentPage} of ${totalPages}…`
-                : 'Formulating unique storylines and age-appropriate line complexity…')}
+                ? `Generating printable black-and-white line art (${completedPages}/${totalPages} completed)`
+                : 'Google Gemini 2.5 Flash Lite is planning your unique page storylines…')}
           </p>
         </div>
       </div>
 
-      {/* Steps checklist */}
+      {/* Real Step Status Checklist */}
       <div className="mt-6 max-w-md mx-auto bg-slate-50 rounded-2xl p-4 border border-slate-100 flex flex-col gap-3 text-left">
         {/* Step 1: AI Book Planning */}
         <div className="flex items-center justify-between text-sm">
@@ -65,32 +74,44 @@ export const GenerationProgress: React.FC<GenerationProgressProps> = ({
               )}
             </div>
             <span className={isPlanningDone ? 'text-slate-800 font-semibold' : 'text-purple-700 font-semibold'}>
-              AI Book Planning
+              Planning pages
             </span>
           </div>
           {isPlanningDone ? (
-            <span className="text-xs font-bold text-emerald-600">✓ Complete</span>
+            <span className="text-xs font-bold text-emerald-600">✓ Book plan created</span>
           ) : (
-            <span className="text-xs text-purple-600 font-medium">Gemini 2.5 Flash Lite…</span>
+            <span className="text-xs text-purple-600 font-medium">Gemini AI planning…</span>
           )}
         </div>
 
-        {/* Step 2: Line Art Prompts & Difficulty */}
+        {/* Step 2: Generating artwork */}
         <div className="flex items-center justify-between text-sm">
           <div className="flex items-center gap-2.5">
             <div
               className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold transition-colors ${
                 isPlanningDone
-                  ? 'bg-purple-600 text-white'
+                  ? completedPages >= totalPages
+                    ? 'bg-emerald-500 text-white'
+                    : 'bg-purple-600 text-white'
                   : 'bg-slate-200 text-slate-400'
               }`}
             >
-              {isPlanningDone ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : '2'}
+              {isPlanningDone ? (
+                completedPages >= totalPages ? (
+                  <Check className="w-3.5 h-3.5 stroke-[3]" />
+                ) : (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                )
+              ) : (
+                '2'
+              )}
             </div>
             <span className={isPlanningDone ? 'text-purple-700 font-semibold' : 'text-slate-400 font-medium'}>
               {isPlanningDone
-                ? `Calibrating concept ${currentPage} of ${totalPages}`
-                : 'Awaiting page outline'}
+                ? completedPages >= totalPages
+                  ? 'All artwork generated'
+                  : `Generating artwork (${completedPages}/${totalPages})`
+                : 'Awaiting line art'}
             </span>
           </div>
           <span className="text-xs font-mono font-bold text-purple-600">
@@ -109,20 +130,31 @@ export const GenerationProgress: React.FC<GenerationProgressProps> = ({
         </div>
       </div>
 
-      {/* Fast-forward preview button */}
-      {onSkip && (
-        <div className="mt-6 pt-4 border-t border-slate-100 flex justify-center">
+      {/* Action buttons (Cancel & Skip) */}
+      <div className="mt-6 pt-4 border-t border-slate-100 flex items-center justify-center gap-4">
+        {onCancel && (
+          <button
+            type="button"
+            onClick={onCancel}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-rose-600 hover:text-rose-800 hover:bg-rose-50 transition-colors cursor-pointer"
+          >
+            <XCircle className="w-3.5 h-3.5" />
+            <span>Cancel generation</span>
+          </button>
+        )}
+
+        {onSkip && (
           <button
             type="button"
             onClick={onSkip}
             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-500 hover:text-purple-700 hover:bg-purple-50 transition-colors cursor-pointer"
-            title="Fast forward preview"
+            title="Fast forward to preview"
           >
             <FastForward className="w-3.5 h-3.5" />
             <span>Fast-forward preview</span>
           </button>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 };

@@ -1,5 +1,6 @@
 import type { Request, Response, NextFunction } from 'express';
 import { BookService } from '../services/book.service.js';
+import { BookGenerationService } from '../services/ai/book-generation.service.js';
 
 export class BookController {
   static async list(_req: Request, res: Response, next: NextFunction): Promise<void> {
@@ -72,6 +73,72 @@ export class BookController {
         success: true,
         book: result.book,
         pages: result.pages,
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  /**
+   * Start image generation for a planned book
+   */
+  static async generate(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const id = String(req.params.id);
+      await BookGenerationService.startBookGeneration(id);
+      res.json({
+        success: true,
+        message: 'Book generation started.',
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  /**
+   * Cancel generation for a book
+   */
+  static async cancel(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const id = String(req.params.id);
+      await BookGenerationService.cancelBookGeneration(id);
+      res.json({
+        success: true,
+        message: 'Book generation cancelled.',
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  /**
+   * Regenerate an individual page
+   */
+  static async regeneratePage(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const bookId = String(req.params.id || req.params.bookId);
+      const pageNumber = Number(req.params.pageNumber || req.params.pageId);
+      const page = await BookGenerationService.regenerateSinglePage(bookId, pageNumber);
+      res.json({
+        success: true,
+        page,
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  /**
+   * Delete an individual page
+   */
+  static async deletePage(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const bookId = String(req.params.id || req.params.bookId);
+      const pageNumber = Number(req.params.pageNumber || req.params.pageId);
+      const result = await BookService.deletePage(bookId, pageNumber);
+      res.json({
+        success: true,
+        remainingPages: result.remainingPages,
       });
     } catch (err) {
       next(err);

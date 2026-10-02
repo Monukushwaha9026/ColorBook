@@ -218,40 +218,110 @@ ColorBook AI connects to Google's official Gen AI SDK (`@google/genai`) to dynam
 
 ---
 
-## 🗄️ Backend API Endpoints
+## 🎨 AI Generation Engine (Step 1 Engine)
 
-- `GET /api/health`: Health status & version check
-- `GET /api/books`: List all books
-- `GET /api/books/:id`: Get a specific book with its pages
-- `POST /api/books`: Create a new book record (`planning` status)
-- `POST /api/books/:id/plan`: **Trigger Gemini AI Book Planner** to generate structured storyline, page concepts, and line art visual prompts
-- `POST /api/books/:id/pages`: Save or update pages
-- `DELETE /api/books/:id`: Delete a book
-- `POST /api/books/:bookId/pages/:pageNumber/regenerate`: Regenerate an individual page concept
+The complete AI Generation Engine converts user concepts into validated, printable black-and-white coloring pages:
 
----
-
-## 🧪 Testing
-
-To run the automated Step 3 verification suite:
-```bash
-npx tsx server/test-step3.ts
+```text
+USER IDEA
+   ↓
+AI BOOK PLANNER (Gemini 2.5 Flash-Lite)
+   ↓
+UNIQUE PAGE CONCEPTS & VISUAL PROMPTS
+   ↓
+IMAGE PROVIDER (Local SD WebUI or Free Provider)
+   ↓
+IMAGE QUALITY & SAFETY VALIDATOR
+   ↓
+LOCAL IMAGE STORAGE (storage/images/books/{id}/page-{num}.png)
+   ↓
+FRONTEND PREVIEW & INDIVIDUAL REGENERATION
 ```
-Covers:
-- Prompt sanitization & injection protection
-- JSON extraction & markdown fence handling
-- Exact page count enforcement (both undersized and oversized conformance)
-- Sequential page numbering ($1$ to $N$)
-- Age-group difficulty mapping
-- Missing API key error response (`AI_CONFIGURATION_ERROR`)
-- End-to-end book planning flow
+
+### 1. Replaceable Image Provider System
+- **Local Provider (`IMAGE_PROVIDER=local`)**: Connects to local Stable Diffusion WebUI / SD.Next / ComfyUI API (`http://localhost:7860`). Returns a friendly controlled error (`LOCAL_IMAGE_PROVIDER_UNAVAILABLE`) if the local server is offline without crashing the app.
+- **Free Provider (`IMAGE_PROVIDER=free`)**: Works 100% out of the box with zero external setup, using public endpoints with deterministic local vector/raster line-art synthesis as a robust $0 development engine.
+- **Image Prompt Builder**: Injects age-calibrated linework rules (thick outlines for 3–6, medium for 7–10, fine for 11–13, intricate for 14–17), strict pure B&W technical constraints, negative cues, and family-friendly safety filtering.
+- **Quality & Safety Validation**: Every generated image is verified for binary format integrity (PNG/JPEG/WebP/SVG), minimum dimensions (>= 512px), non-empty buffers, and clean linework before being accepted.
+- **Automatic Retry Loop**: Up to 3 attempts with dynamic seeds and parameter variation before failing a page.
+
+### 2. Storage System
+- Saves generated coloring pages to `storage/images/books/{bookId}/page-{pageNumber}.png`.
+- Serves static assets directly via Express at `/storage/images` and `/api/storage/images`.
+- Provides automatic file cleanup when books or individual pages are deleted.
+
+### 3. Orchestration & State Management
+- **Background Worker**: `POST /api/books/:id/generate` responds immediately with `202 Accepted` while generation runs asynchronously in the background.
+- **Controlled Concurrency**: Configurable worker pool (`IMAGE_GENERATION_CONCURRENCY=1`) prevents CPU/GPU starvation.
+- **Live Polling**: Frontend polls `GET /api/books/:id` every 1.5 seconds with live stage checklists and page completion counts.
+- **Independent Page Regeneration**: `POST /api/books/:id/pages/:pageNumber/regenerate` redraws only the targeted page with fresh variation cues while preserving all other completed pages.
+- **Page Deletion & Renumbering**: `DELETE /api/books/:id/pages/:pageNumber` deletes the page and sequentially re-indexes remaining pages ($1, 2, 3...$).
+- **Cancellation**: `POST /api/books/:id/cancel` immediately halts ongoing generation workers and updates the book status to `cancelled`.
 
 ---
 
-## 🔮 Next Step (Step 4 Preview)
+## 🔑 Environment Configuration
 
-- Connect real black-and-white image generation using Gemini / Imagen / FLUX line art models
-- Generate actual coloring line art using the engineered `visualPrompt` from Step 3
-- Cloud image storage (S3 / Cloudinary)
-- Print-ready PDF compilation (PDFKit / Puppeteer)
+Create or update `.env`:
+
+```env
+PORT=5000
+NODE_ENV=development
+CLIENT_URL=http://localhost:5173
+DATABASE_URL="postgresql://postgres:postgres@localhost:5432/colorbook_ai?schema=public"
+
+# AI Book Planner (Gemini)
+GEMINI_TEXT_MODEL=gemini-2.5-flash-lite
+GEMINI_API_KEY=your_gemini_api_key_here
+
+# Image Generation Provider ('local' or 'free')
+IMAGE_PROVIDER=local
+LOCAL_IMAGE_API_URL=http://localhost:7860
+
+# Image Storage
+IMAGE_STORAGE=local
+LOCAL_IMAGE_STORAGE_PATH=./storage/images
+
+# Concurrency & Retries
+IMAGE_GENERATION_CONCURRENCY=1
+MAX_IMAGE_GENERATION_ATTEMPTS=3
+```
+
+---
+
+## 🗄️ Complete API Endpoints
+
+| Method | Endpoint | Description |
+|---|---|---|
+| `GET` | `/api/health` | Service health status check |
+| `GET` | `/api/books` | List all coloring books |
+| `GET` | `/api/books/:id` | Get book details, pages, and generation progress |
+| `POST` | `/api/books` | Create a new coloring book draft |
+| `POST` | `/api/books/:id/plan` | Generate structured storyline & page concepts with Gemini |
+| `POST` | `/api/books/:id/generate` | Start asynchronous background image generation engine |
+| `POST` | `/api/books/:id/cancel` | Cancel ongoing background generation job |
+| `POST` | `/api/books/:id/pages/:pageNumber/regenerate` | Individually regenerate a single page with variation |
+| `DELETE` | `/api/books/:id/pages/:pageNumber` | Delete a single page and renumber remaining pages |
+| `DELETE` | `/api/books/:id` | Delete entire book and clean up stored images |
+
+---
+
+## 🧪 Automated Test Suite
+
+Run the full 63-step test suite covering prompt generation, image validation, retries, offline handling, storage, orchestration, regeneration, deletion, and cancellation:
+
+```bash
+npx tsx server/test-engine.ts
+```
+
+All 63 tests pass cleanly.
+
+---
+
+## 🔮 Next Step (Step 2 Preview)
+
+- Implement printable PDF generation (A4 and US Letter sizes, Portrait and Landscape orientations)
+- Print-ready margins, cover page, and page borders
+- Direct high-resolution PDF download in the frontend
+
 

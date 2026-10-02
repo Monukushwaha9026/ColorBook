@@ -119,6 +119,33 @@ export const api = {
   },
 
   /**
+   * Start asynchronous image generation for a planned book
+   */
+  async startGeneration(bookId: string): Promise<{ success: boolean; message: string }> {
+    return request<{ success: boolean; message: string }>(`/books/${bookId}/generate`, {
+      method: 'POST',
+    });
+  },
+
+  /**
+   * Cancel an ongoing book generation job
+   */
+  async cancelGeneration(bookId: string): Promise<{ success: boolean; message: string }> {
+    return request<{ success: boolean; message: string }>(`/books/${bookId}/cancel`, {
+      method: 'POST',
+    });
+  },
+
+  /**
+   * Delete an individual page and renumber remaining pages
+   */
+  async deletePage(bookId: string, pageNumber: number): Promise<{ success: boolean; remainingPages: ColoringPageItem[] }> {
+    return request<{ success: boolean; remainingPages: ColoringPageItem[] }>(`/books/${bookId}/pages/${pageNumber}`, {
+      method: 'DELETE',
+    });
+  },
+
+  /**
    * Regenerate a single coloring page without regenerating the entire book
    */
   async regeneratePage(bookId: string, pageNumber: number, concept?: string): Promise<RegeneratePageResponse> {

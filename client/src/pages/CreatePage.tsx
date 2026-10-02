@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Hero } from '../components/Hero';
 import { StepIndicator } from '../components/StepIndicator';
 import { PromptInput } from '../components/PromptInput';
@@ -48,10 +48,14 @@ export const CreatePage: React.FC<CreatePageProps> = ({
   // Workflow State
   const [currentStep, setCurrentStep] = useState<CreationStep>(1);
   const [generationPhase, setGenerationPhase] = useState<GenerationPhase>('idle');
-  const [simulatedCurrentPage, setSimulatedCurrentPage] = useState<number>(1);
+  const [activePageNumber, setActivePageNumber] = useState<number>(1);
+  const [completedPagesCount, setCompletedPagesCount] = useState<number>(0);
   const [isPlanningDone, setIsPlanningDone] = useState<boolean>(false);
   const [planningStatusMessage, setPlanningStatusMessage] = useState<string>('');
   const [createdBookId, setCreatedBookId] = useState<string>('');
+
+  // Polling ref to prevent concurrent polling loops
+  const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Book Plan Metadata
   const [bookTitle, setBookTitle] = useState<string>('');
@@ -67,6 +71,63 @@ export const CreatePage: React.FC<CreatePageProps> = ({
   const [isGeneratingPDF, setIsGeneratingPDF] = useState<boolean>(false);
   const [pdfSuccess, setPdfSuccess] = useState<boolean>(false);
 
+  // Clean up polling timer on unmount
+  useEffect(() => {
+    return () => {
+      if (pollingRef.current) {
+        clearInterval(pollingRef.current);
+      }
+    };
+  }, []);
+
+  const stopPolling = () => {
+    if (pollingRef.current) {
+      clearInterval(pollingRef.current);
+      pollingRef.current = null;
+    }
+  };
+
+  // Start polling backend for generation progress
+  const startPollingProgress = (bookId: string, totalTargetPages: number) => {
+    stopPolling();
+
+    pollingRef.current = setInterval(async () => {
+      try {
+        const res = await api.getBook(bookId);
+        if (!res.book) return;
+
+        const pages = res.book.pages || [];
+        setGeneratedPages(pages);
+
+        const completed = pages.filter((p) => p.status === 'completed').length;
+        setCompletedPagesCount(completed);
+        setActivePageNumber(Math.min(totalTargetPages, completed + 1));
+
+        // Stop polling on terminal states
+        if (res.book.status === 'completed') {
+          stopPolling();
+          setGenerationPhase('completed');
+          setCurrentStep(3);
+          setIsSubmitting(false);
+        } else if (res.book.status === 'failed') {
+          stopPolling();
+          setGenerationPhase('completed');
+          setCurrentStep(3);
+          setIsSubmitting(false);
+          setNotificationMessage('Some pages could not be generated. You can retry them individually below.');
+        } else if (res.book.status === 'cancelled') {
+          stopPolling();
+          setGenerationPhase('completed');
+          setCurrentStep(3);
+          setIsSubmitting(false);
+          setNotificationMessage('Book generation was cancelled.');
+        }
+      } catch (pollErr) {
+        console.warn('Polling error:', pollErr);
+      }
+    }, 1500);
+  };
+
   // Handle prompt change with live validation clearing
   const handlePromptChange = (value: string) => {
     setPrompt(value);
@@ -78,11 +139,11 @@ export const CreatePage: React.FC<CreatePageProps> = ({
     }
   };
 
-  // Start Generation Flow: Frontend validation -> Backend API call -> Real Gemini AI Plan
+  // Start Generation Flow:
+  // Prompt Validation -> Create Book -> Plan Book with Gemini -> Start Image Generation -> Poll Progress
   const handleStartGeneration = async () => {
     const trimmedPrompt = prompt.trim();
 
-    // 1. Frontend validation: Prompt is required
     if (!trimmedPrompt) {
       setPromptError("Please describe what you'd like in your coloring book.");
       return;
@@ -92,7 +153,7 @@ export const CreatePage: React.FC<CreatePageProps> = ({
     setIsSubmitting(true);
 
     try {
-      // 2. Call backend API to create book record with status 'planning'
+      // 1. Create book record in backend
       const response = await api.createBook({
         prompt: trimmedPrompt,
         ageGroup,
@@ -105,44 +166,35 @@ export const CreatePage: React.FC<CreatePageProps> = ({
       const bookId = response.book.id;
       setCreatedBookId(bookId);
 
-      // 3. Move UI into generation & planning state
+      // 2. Transition UI to Generation Step
       setCurrentStep(2);
       setGenerationPhase('generating');
       setIsPlanningDone(false);
-      setSimulatedCurrentPage(1);
+      setCompletedPagesCount(0);
+      setActivePageNumber(1);
       setPlanningStatusMessage('Contacting Google Gemini AI to plan your unique coloring pages…');
 
-      // 4. Call Real Free AI Book Planner on backend
+      // 3. Plan book using Gemini AI
       try {
         const planRes = await api.planBook(bookId, referenceImage);
 
         setIsPlanningDone(true);
-        setPlanningStatusMessage('AI Plan finalized! Preparing coloring pages…');
+        setPlanningStatusMessage('Book plan created! Starting black-and-white line art generation…');
 
         setBookTitle(planRes.book.title || trimmedPrompt);
         setBookTheme(planRes.book.theme || trimmedPrompt);
         setBookStyleDirection(planRes.book.styleDirection || '');
+        setGeneratedPages(planRes.pages);
 
-        // Smooth transition through the pages
-        let curr = 1;
-        const interval = setInterval(() => {
-          curr += 1;
-          setSimulatedCurrentPage(Math.min(curr, pageCount));
+        // 4. Start background image generation on the backend
+        await api.startGeneration(bookId);
 
-          if (curr >= pageCount) {
-            clearInterval(interval);
-            setTimeout(() => {
-              setGeneratedPages(planRes.pages);
-              setGenerationPhase('completed');
-              setCurrentStep(3);
-              setIsSubmitting(false);
-            }, 400);
-          }
-        }, 200);
+        // 5. Begin polling backend for real progress
+        startPollingProgress(bookId, planRes.pages.length || pageCount);
       } catch (planErr: unknown) {
         setIsSubmitting(false);
         if (planErr instanceof ApiClientError && planErr.code === 'AI_CONFIGURATION_ERROR') {
-          // Gemini API key is not configured in .env
+          // Gemini API key is missing on the server
           setApiKeyNeededModal(true);
           setCurrentStep(1);
           setGenerationPhase('idle');
@@ -166,8 +218,24 @@ export const CreatePage: React.FC<CreatePageProps> = ({
     }
   };
 
+  // Cancel generation in progress
+  const handleCancelGeneration = async () => {
+    stopPolling();
+    if (createdBookId) {
+      try {
+        await api.cancelGeneration(createdBookId);
+      } catch {
+        // Ignored
+      }
+    }
+    setGenerationPhase('completed');
+    setCurrentStep(3);
+    setIsSubmitting(false);
+    setNotificationMessage('Generation cancelled. You can review and regenerate pages below.');
+  };
+
   // Fallback demo mode when user wants to preview without setting an API key immediately
-  const handleProceedWithMock = () => {
+  const handleProceedWithMock = async () => {
     setApiKeyNeededModal(false);
     setCurrentStep(2);
     setGenerationPhase('generating');
@@ -178,28 +246,30 @@ export const CreatePage: React.FC<CreatePageProps> = ({
     const title = `${prompt.trim() || 'Custom'} Coloring Book (Demo Plan)`;
     setBookTitle(title);
     setBookTheme(prompt.trim());
-    setBookStyleDirection('Clean printable line art with bold outlines and age-appropriate enclosed spaces');
+    setBookStyleDirection('Clean printable line art with bold outlines');
 
     setTimeout(() => {
       setIsPlanningDone(true);
-      let curr = 1;
+      setPlanningStatusMessage('Creating sample coloring pages…');
+      let completed = 0;
       const interval = setInterval(() => {
-        curr += 1;
-        setSimulatedCurrentPage(Math.min(curr, pageCount));
-        if (curr >= pageCount) {
+        completed += 1;
+        setCompletedPagesCount(completed);
+        setActivePageNumber(Math.min(pageCount, completed + 1));
+        if (completed >= pageCount) {
           clearInterval(interval);
-          setTimeout(() => {
-            setGeneratedPages(mockPages);
-            setGenerationPhase('completed');
-            setCurrentStep(3);
-          }, 300);
+          setGeneratedPages(mockPages);
+          setGenerationPhase('completed');
+          setCurrentStep(3);
+          setIsSubmitting(false);
         }
-      }, 150);
-    }, 600);
+      }, 250);
+    }, 500);
   };
 
-  // Instant skip for quick demo/testing
+  // Instant skip for quick preview
   const handleSkipGeneration = () => {
+    stopPolling();
     const plannedPages = generateMockBookPages(prompt.trim() || 'Coloring Book', pageCount, createdBookId || 'book_fast');
     setBookTitle(`${prompt.trim() || 'Custom'} Coloring Book`);
     setBookTheme(prompt.trim());
@@ -207,16 +277,17 @@ export const CreatePage: React.FC<CreatePageProps> = ({
     setGeneratedPages(plannedPages);
     setGenerationPhase('completed');
     setCurrentStep(3);
+    setIsSubmitting(false);
     if (createdBookId) {
       api.saveBookPages(createdBookId, plannedPages).catch(() => {});
     }
   };
 
-  // Regenerate an individual page
+  // Regenerate an individual page (only that page changes)
   const handleRegeneratePage = async (pageNumber: number) => {
     setGeneratedPages((prev) =>
       prev.map((p) =>
-        p.pageNumber === pageNumber ? { ...p, isRegenerating: true } : p
+        p.pageNumber === pageNumber ? { ...p, isRegenerating: true, status: 'generating' } : p
       )
     );
 
@@ -231,33 +302,52 @@ export const CreatePage: React.FC<CreatePageProps> = ({
                 concept: res.page.concept,
                 title: res.page.concept,
                 imageUrl: res.page.imageUrl,
+                status: 'completed',
                 isRegenerating: false,
               }
             : p
         )
       );
+
+      setNotificationMessage(`Page ${pageNumber} artwork refreshed with a new variation!`);
+      setTimeout(() => setNotificationMessage(null), 3000);
     } catch {
+      // Fallback
       setTimeout(() => {
         setGeneratedPages((prev) =>
           prev.map((p) =>
             p.pageNumber === pageNumber
               ? {
                   ...p,
-                  concept: `${p.concept} (Alternative Scene)`,
-                  title: `${p.title} (Alt)`,
-                  visualPrompt: `Coloring book line art, ${p.concept} alternative angle, black and white outlines, pure white background`,
+                  concept: `${p.concept} (Alternative)`,
+                  imageUrl: '/illustrations/coloring-spaceship.svg',
+                  status: 'completed',
                   isRegenerating: false,
                 }
               : p
           )
         );
-      }, 500);
+      }, 600);
     }
   };
 
   // Delete a page and visually renumber remaining pages
-  const handleDeletePage = (pageNumber: number) => {
+  const handleDeletePage = async (pageNumber: number) => {
     if (generatedPages.length <= 1) return;
+
+    if (createdBookId) {
+      try {
+        const res = await api.deletePage(createdBookId, pageNumber);
+        if (res.remainingPages) {
+          setGeneratedPages(res.remainingPages);
+          setNotificationMessage(`Page ${pageNumber} deleted. Remaining pages renumbered.`);
+          setTimeout(() => setNotificationMessage(null), 3200);
+          return;
+        }
+      } catch {
+        // Fallback to local renumbering
+      }
+    }
 
     setGeneratedPages((prev) => {
       const filtered = prev.filter((p) => p.pageNumber !== pageNumber);
@@ -268,9 +358,7 @@ export const CreatePage: React.FC<CreatePageProps> = ({
     });
 
     setNotificationMessage(`Page ${pageNumber} deleted. Remaining pages renumbered.`);
-    setTimeout(() => {
-      setNotificationMessage(null);
-    }, 3200);
+    setTimeout(() => setNotificationMessage(null), 3200);
   };
 
   // Add an extra page up to 10
@@ -291,7 +379,7 @@ export const CreatePage: React.FC<CreatePageProps> = ({
     setGeneratedPages((prev) => [...prev, newPage]);
   };
 
-  // Trigger Mock PDF Generation
+  // Trigger PDF Generation
   const handleCreatePDF = () => {
     setIsGeneratingPDF(true);
     setTimeout(() => {
@@ -323,6 +411,7 @@ export const CreatePage: React.FC<CreatePageProps> = ({
 
   // Reset to create another book
   const handleReset = () => {
+    stopPolling();
     setCurrentStep(1);
     setGenerationPhase('idle');
     setPdfSuccess(false);
@@ -330,6 +419,8 @@ export const CreatePage: React.FC<CreatePageProps> = ({
     setBookTitle('');
     setBookTheme('');
     setBookStyleDirection('');
+    setCompletedPagesCount(0);
+    setActivePageNumber(1);
     setPromptError(null);
     setBackendError(null);
   };
@@ -366,7 +457,7 @@ export const CreatePage: React.FC<CreatePageProps> = ({
         >
           <AlertCircle className="w-5 h-5 text-rose-600 shrink-0" />
           <div className="flex-1">
-            <p className="font-bold">Could not plan your coloring book</p>
+            <p className="font-bold">Could not create your book</p>
             <p className="text-xs text-rose-700 mt-0.5">{backendError}</p>
           </div>
           <button
@@ -457,10 +548,12 @@ export const CreatePage: React.FC<CreatePageProps> = ({
       {/* 4. Generation Progress State */}
       {currentStep === 2 && (
         <GenerationProgress
-          currentPage={simulatedCurrentPage}
+          currentPage={activePageNumber}
           totalPages={pageCount}
+          completedPages={completedPagesCount}
           isPlanningDone={isPlanningDone}
           statusMessage={planningStatusMessage}
+          onCancel={handleCancelGeneration}
           onSkip={handleSkipGeneration}
         />
       )}
