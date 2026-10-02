@@ -63,6 +63,21 @@ export class BookController {
     }
   }
 
+  static async plan(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const id = String(req.params.id);
+      const referenceImage = req.body?.referenceImage || null;
+      const result = await BookService.planBook(id, referenceImage);
+      res.json({
+        success: true,
+        book: result.book,
+        pages: result.pages,
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+
   static async delete(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const id = String(req.params.id);

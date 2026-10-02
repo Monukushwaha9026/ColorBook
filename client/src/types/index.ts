@@ -17,8 +17,10 @@ export interface ColoringPageItem {
   concept: string;
   title: string;
   description?: string;
-  imageUrl: string;
-  status?: 'pending' | 'generating' | 'completed' | 'failed';
+  visualPrompt?: string;
+  difficulty?: 'easy' | 'medium' | 'detailed' | 'intricate' | string;
+  imageUrl?: string | null;
+  status?: 'pending' | 'planned' | 'generating' | 'completed' | 'failed';
   isRegenerating?: boolean;
 }
 
@@ -29,19 +31,27 @@ export type CreationStep = 1 | 2 | 3 | 4;
 
 export interface Book {
   id: string;
-  title: string;
+  title?: string;
+  theme?: string;
+  styleDirection?: string;
   prompt: string;
   ageGroup: AgeGroupId;
   pageCount: number;
   status: BookStatus;
   pages: ColoringPageItem[];
-  paperSize: PaperSize;
-  orientation: Orientation;
+  paperSize?: PaperSize;
+  orientation?: Orientation;
   referenceImage?: string | null;
   referenceImageUrl?: string | null;
   createdAt: string;
   updatedAt?: string;
-  coverImage: string;
+  coverImage?: string;
+}
+
+export interface PlanBookResponse {
+  success: boolean;
+  book: Book;
+  pages: ColoringPageItem[];
 }
 
 export interface SuggestedPrompt {

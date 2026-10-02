@@ -1,4 +1,4 @@
-import type { CreateBookPayload, AgeGroupId, BookStatus, ColoringPageItem, Book } from '../types';
+import type { CreateBookPayload, AgeGroupId, BookStatus, ColoringPageItem, Book, PlanBookResponse } from '../types';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
 
@@ -88,6 +88,16 @@ export const api = {
     return request<CreateBookResponse>('/books', {
       method: 'POST',
       body: JSON.stringify(payload),
+    });
+  },
+
+  /**
+   * Request Gemini AI to plan the book's storyline, pages, and line-art prompts
+   */
+  async planBook(bookId: string, referenceImage?: string | null): Promise<PlanBookResponse> {
+    return request<PlanBookResponse>(`/books/${bookId}/plan`, {
+      method: 'POST',
+      body: JSON.stringify({ referenceImage }),
     });
   },
 

@@ -175,21 +175,83 @@ Open [http://localhost:5173](http://localhost:5173) in your browser.
 
 ---
 
-## 🗄️ Backend API Endpoints
+## 🤖 Step 3: Free-Tier AI Book Planner (Google Gemini 2.5 Flash Lite)
 
-- `GET /api/health`: Health status & version check
-- `GET /api/books`: List books (with optional `userId` filter)
-- `GET /api/books/:id`: Get a specific book with its generated pages
-- `POST /api/books`: Create a new book record (validated via Zod)
-- `DELETE /api/books/:id`: Delete a book
-- `POST /api/books/:bookId/pages/:pageNumber/regenerate`: Mock regenerate an individual page
+ColorBook AI connects to Google's official Gen AI SDK (`@google/genai`) to dynamically generate structured coloring book plans:
+
+- **Free-Tier Model**: `gemini-2.5-flash-lite`
+- **Backend-Only Security**: `GEMINI_API_KEY` is loaded and executed strictly on the server and is never exposed to the client or browser bundle.
+- **Exact Page Count Enforcement**: Generates exactly the requested number of pages ($1$ to $10$).
+- **Structured Storylines**: Generates unified titles, themes, style directions, unique scenes per page, and age-calibrated line art prompts.
+- **Age Complexity Calibration**:
+  - `kids` (3–6): Bold, thick outlines, simple shapes, `easy` difficulty.
+  - `children` (7–10): Clean outlines, playful scenes, `easy` or `medium` difficulty.
+  - `teens` (11–13): Expressive linework, layered composition, `medium` or `detailed` difficulty.
+  - `teen_plus` (14–17): Intricate line art, decorative patterns, `detailed` or `intricate` difficulty.
+- **Line Art Visual Prompts**: Engineered visual prompts for black-and-white coloring pages (no colors, no shading, enclosed spaces).
+- **Graceful Error Handling**: If `GEMINI_API_KEY` is missing or invalid, the backend returns:
+  ```json
+  {
+    "success": false,
+    "error": {
+      "code": "AI_CONFIGURATION_ERROR",
+      "message": "Gemini API is not configured."
+    }
+  }
+  ```
+  The frontend gracefully detects this with an interactive modal and provides a 1-click "Preview with Sample AI Plan (Demo Mode)" option.
 
 ---
 
-## 🔮 Next Step (Step 2 Preview)
+## 🔑 Setting Up Google Gemini API Key
 
-- Implement the real AI book-planning and prompt expansion engine
-- Connect the real image-generation API (e.g. Gemini Imagen / Stable Diffusion / Flux line art model)
-- Implement cloud image storage (S3 / Cloudinary)
-- Implement server-side PDF generation using PDFKit or Puppeteer
-- Connect live PostgreSQL database via Prisma migrations
+1. Get a free API key at [Google AI Studio](https://aistudio.google.com/).
+2. Open `.env` (or copy `.env.example` to `.env`):
+   ```env
+   GEMINI_API_KEY=your_gemini_api_key_here
+   GEMINI_TEXT_MODEL=gemini-2.5-flash-lite
+   ```
+3. Restart the server:
+   ```bash
+   npm run dev
+   ```
+
+---
+
+## 🗄️ Backend API Endpoints
+
+- `GET /api/health`: Health status & version check
+- `GET /api/books`: List all books
+- `GET /api/books/:id`: Get a specific book with its pages
+- `POST /api/books`: Create a new book record (`planning` status)
+- `POST /api/books/:id/plan`: **Trigger Gemini AI Book Planner** to generate structured storyline, page concepts, and line art visual prompts
+- `POST /api/books/:id/pages`: Save or update pages
+- `DELETE /api/books/:id`: Delete a book
+- `POST /api/books/:bookId/pages/:pageNumber/regenerate`: Regenerate an individual page concept
+
+---
+
+## 🧪 Testing
+
+To run the automated Step 3 verification suite:
+```bash
+npx tsx server/test-step3.ts
+```
+Covers:
+- Prompt sanitization & injection protection
+- JSON extraction & markdown fence handling
+- Exact page count enforcement (both undersized and oversized conformance)
+- Sequential page numbering ($1$ to $N$)
+- Age-group difficulty mapping
+- Missing API key error response (`AI_CONFIGURATION_ERROR`)
+- End-to-end book planning flow
+
+---
+
+## 🔮 Next Step (Step 4 Preview)
+
+- Connect real black-and-white image generation using Gemini / Imagen / FLUX line art models
+- Generate actual coloring line art using the engineered `visualPrompt` from Step 3
+- Cloud image storage (S3 / Cloudinary)
+- Print-ready PDF compilation (PDFKit / Puppeteer)
+

@@ -1,5 +1,6 @@
 import express from 'express';
 import cors from 'cors';
+import path from 'path';
 import dotenv from 'dotenv';
 import { bookRouter } from './routes/book.routes.js';
 import { pageRouter, standalonePageRouter } from './routes/page.routes.js';
@@ -7,6 +8,8 @@ import { healthRouter } from './routes/health.routes.js';
 import { errorHandler } from './middleware/errorHandler.js';
 
 dotenv.config();
+dotenv.config({ path: path.resolve(process.cwd(), '../.env') });
+dotenv.config({ path: path.resolve(process.cwd(), '.env') });
 
 const app = express();
 const PORT = process.env.PORT || 5000;

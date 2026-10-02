@@ -12,7 +12,7 @@ import { PDFSettings } from '../components/PDFSettings';
 import { PDFSuccessCard } from '../components/PDFSuccessCard';
 import { api, ApiClientError } from '../lib/api';
 import { generateMockBookPages } from '../lib/mockPlanner';
-import { AlertCircle } from 'lucide-react';
+import { AlertCircle, KeyRound, Sparkles, X, ExternalLink, ArrowRight } from 'lucide-react';
 import type {
   AgeGroupId,
   ColoringPageItem,
@@ -43,13 +43,20 @@ export const CreatePage: React.FC<CreatePageProps> = ({
   const [backendError, setBackendError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [notificationMessage, setNotificationMessage] = useState<string | null>(null);
+  const [apiKeyNeededModal, setApiKeyNeededModal] = useState<boolean>(false);
 
   // Workflow State
   const [currentStep, setCurrentStep] = useState<CreationStep>(1);
   const [generationPhase, setGenerationPhase] = useState<GenerationPhase>('idle');
   const [simulatedCurrentPage, setSimulatedCurrentPage] = useState<number>(1);
   const [isPlanningDone, setIsPlanningDone] = useState<boolean>(false);
+  const [planningStatusMessage, setPlanningStatusMessage] = useState<string>('');
   const [createdBookId, setCreatedBookId] = useState<string>('');
+
+  // Book Plan Metadata
+  const [bookTitle, setBookTitle] = useState<string>('');
+  const [bookTheme, setBookTheme] = useState<string>('');
+  const [bookStyleDirection, setBookStyleDirection] = useState<string>('');
 
   // Generated Pages State
   const [generatedPages, setGeneratedPages] = useState<ColoringPageItem[]>([]);
@@ -71,7 +78,7 @@ export const CreatePage: React.FC<CreatePageProps> = ({
     }
   };
 
-  // Start Generation Flow: Frontend validation -> Backend API call -> Mock Generation
+  // Start Generation Flow: Frontend validation -> Backend API call -> Real Gemini AI Plan
   const handleStartGeneration = async () => {
     const trimmedPrompt = prompt.trim();
 
@@ -97,43 +104,56 @@ export const CreatePage: React.FC<CreatePageProps> = ({
 
       const bookId = response.book.id;
       setCreatedBookId(bookId);
-      setIsSubmitting(false);
 
-      // 3. Move UI into generation state
+      // 3. Move UI into generation & planning state
       setCurrentStep(2);
       setGenerationPhase('generating');
       setIsPlanningDone(false);
       setSimulatedCurrentPage(1);
+      setPlanningStatusMessage('Contacting Google Gemini AI to plan your unique coloring pages…');
 
-      // 4. Generate mock page concepts matching prompt and exact selected pageCount
-      const plannedPages = generateMockBookPages(trimmedPrompt, pageCount, bookId);
+      // 4. Call Real Free AI Book Planner on backend
+      try {
+        const planRes = await api.planBook(bookId, referenceImage);
 
-      // 5. Realistic simulated multi-stage timeline
-      setTimeout(() => {
         setIsPlanningDone(true);
+        setPlanningStatusMessage('AI Plan finalized! Preparing coloring pages…');
 
-        let current = 1;
+        setBookTitle(planRes.book.title || trimmedPrompt);
+        setBookTheme(planRes.book.theme || trimmedPrompt);
+        setBookStyleDirection(planRes.book.styleDirection || '');
+
+        // Smooth transition through the pages
+        let curr = 1;
         const interval = setInterval(() => {
-          current += 1;
-          setSimulatedCurrentPage(Math.min(current, pageCount));
+          curr += 1;
+          setSimulatedCurrentPage(Math.min(curr, pageCount));
 
-          if (current >= pageCount) {
+          if (curr >= pageCount) {
             clearInterval(interval);
             setTimeout(() => {
-              setGeneratedPages(plannedPages);
+              setGeneratedPages(planRes.pages);
               setGenerationPhase('completed');
               setCurrentStep(3);
-
-              // Persist generated pages to backend
-              api.saveBookPages(bookId, plannedPages).catch(() => {
-                // Non-blocking in-memory sync
-              });
-            }, 500);
+              setIsSubmitting(false);
+            }, 400);
           }
-        }, 350);
-      }, 850);
+        }, 200);
+      } catch (planErr: unknown) {
+        setIsSubmitting(false);
+        if (planErr instanceof ApiClientError && planErr.code === 'AI_CONFIGURATION_ERROR') {
+          // Gemini API key is not configured in .env
+          setApiKeyNeededModal(true);
+          setCurrentStep(1);
+          setGenerationPhase('idle');
+          return;
+        }
+        throw planErr;
+      }
     } catch (err: unknown) {
       setIsSubmitting(false);
+      setCurrentStep(1);
+      setGenerationPhase('idle');
       if (err instanceof ApiClientError) {
         if (err.code === 'INVALID_PROMPT') {
           setPromptError(err.message);
@@ -146,9 +166,44 @@ export const CreatePage: React.FC<CreatePageProps> = ({
     }
   };
 
+  // Fallback demo mode when user wants to preview without setting an API key immediately
+  const handleProceedWithMock = () => {
+    setApiKeyNeededModal(false);
+    setCurrentStep(2);
+    setGenerationPhase('generating');
+    setIsPlanningDone(false);
+    setPlanningStatusMessage('Generating sample AI book plan with unique concepts…');
+
+    const mockPages = generateMockBookPages(prompt.trim() || 'Coloring Book', pageCount, createdBookId || 'demo_book');
+    const title = `${prompt.trim() || 'Custom'} Coloring Book (Demo Plan)`;
+    setBookTitle(title);
+    setBookTheme(prompt.trim());
+    setBookStyleDirection('Clean printable line art with bold outlines and age-appropriate enclosed spaces');
+
+    setTimeout(() => {
+      setIsPlanningDone(true);
+      let curr = 1;
+      const interval = setInterval(() => {
+        curr += 1;
+        setSimulatedCurrentPage(Math.min(curr, pageCount));
+        if (curr >= pageCount) {
+          clearInterval(interval);
+          setTimeout(() => {
+            setGeneratedPages(mockPages);
+            setGenerationPhase('completed');
+            setCurrentStep(3);
+          }, 300);
+        }
+      }, 150);
+    }, 600);
+  };
+
   // Instant skip for quick demo/testing
   const handleSkipGeneration = () => {
     const plannedPages = generateMockBookPages(prompt.trim() || 'Coloring Book', pageCount, createdBookId || 'book_fast');
+    setBookTitle(`${prompt.trim() || 'Custom'} Coloring Book`);
+    setBookTheme(prompt.trim());
+    setBookStyleDirection('Clean printable line art');
     setGeneratedPages(plannedPages);
     setGenerationPhase('completed');
     setCurrentStep(3);
@@ -157,9 +212,8 @@ export const CreatePage: React.FC<CreatePageProps> = ({
     }
   };
 
-  // Regenerate an individual page (only that page changes)
+  // Regenerate an individual page
   const handleRegeneratePage = async (pageNumber: number) => {
-    // Set loading state on that card only
     setGeneratedPages((prev) =>
       prev.map((p) =>
         p.pageNumber === pageNumber ? { ...p, isRegenerating: true } : p
@@ -167,7 +221,6 @@ export const CreatePage: React.FC<CreatePageProps> = ({
     );
 
     try {
-      // Call backend API regeneration endpoint
       const res = await api.regeneratePage(createdBookId || 'current_book', pageNumber);
 
       setGeneratedPages((prev) =>
@@ -184,22 +237,21 @@ export const CreatePage: React.FC<CreatePageProps> = ({
         )
       );
     } catch {
-      // Graceful fallback to client-side rotation
       setTimeout(() => {
         setGeneratedPages((prev) =>
           prev.map((p) =>
             p.pageNumber === pageNumber
               ? {
                   ...p,
-                  concept: `${p.concept} (Alternative)`,
-                  title: `${p.title} (Alternative)`,
-                  imageUrl: '/illustrations/coloring-spaceship.svg',
+                  concept: `${p.concept} (Alternative Scene)`,
+                  title: `${p.title} (Alt)`,
+                  visualPrompt: `Coloring book line art, ${p.concept} alternative angle, black and white outlines, pure white background`,
                   isRegenerating: false,
                 }
               : p
           )
         );
-      }, 600);
+      }, 500);
     }
   };
 
@@ -215,7 +267,6 @@ export const CreatePage: React.FC<CreatePageProps> = ({
       }));
     });
 
-    // Show subtle feedback message
     setNotificationMessage(`Page ${pageNumber} deleted. Remaining pages renumbered.`);
     setTimeout(() => {
       setNotificationMessage(null);
@@ -233,6 +284,9 @@ export const CreatePage: React.FC<CreatePageProps> = ({
       ...template,
       id: `page_${createdBookId || 'cur'}_${newPageNum}_${Date.now()}`,
       pageNumber: newPageNum,
+      visualPrompt: `Coloring book line art, pure black lines on white background, ${template.concept}, crisp outlines, no shading`,
+      difficulty: 'medium',
+      status: 'planned',
     };
     setGeneratedPages((prev) => [...prev, newPage]);
   };
@@ -245,11 +299,12 @@ export const CreatePage: React.FC<CreatePageProps> = ({
       setPdfSuccess(true);
       setCurrentStep(4);
 
-      // Save to My Books if callback provided
       if (onSaveBook) {
         const newBook: Book = {
           id: createdBookId || `book_${Date.now()}`,
-          title: prompt.slice(0, 36) || 'Custom Coloring Book',
+          title: bookTitle || prompt.slice(0, 36) || 'Custom Coloring Book',
+          theme: bookTheme || prompt,
+          styleDirection: bookStyleDirection,
           prompt,
           ageGroup,
           pageCount: generatedPages.length,
@@ -272,6 +327,9 @@ export const CreatePage: React.FC<CreatePageProps> = ({
     setGenerationPhase('idle');
     setPdfSuccess(false);
     setGeneratedPages([]);
+    setBookTitle('');
+    setBookTheme('');
+    setBookStyleDirection('');
     setPromptError(null);
     setBackendError(null);
   };
@@ -308,7 +366,7 @@ export const CreatePage: React.FC<CreatePageProps> = ({
         >
           <AlertCircle className="w-5 h-5 text-rose-600 shrink-0" />
           <div className="flex-1">
-            <p className="font-bold">Could not create your book</p>
+            <p className="font-bold">Could not plan your coloring book</p>
             <p className="text-xs text-rose-700 mt-0.5">{backendError}</p>
           </div>
           <button
@@ -321,7 +379,7 @@ export const CreatePage: React.FC<CreatePageProps> = ({
         </div>
       )}
 
-      {/* 3. Creation Workspace (Two-column layout on desktop, stacked on mobile) */}
+      {/* 3. Creation Workspace */}
       {currentStep === 1 && (
         <div className="bg-white rounded-3xl border border-slate-200/90 shadow-soft p-5 sm:p-8 lg:p-10 transition-all duration-300">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-10">
@@ -402,6 +460,7 @@ export const CreatePage: React.FC<CreatePageProps> = ({
           currentPage={simulatedCurrentPage}
           totalPages={pageCount}
           isPlanningDone={isPlanningDone}
+          statusMessage={planningStatusMessage}
           onSkip={handleSkipGeneration}
         />
       )}
@@ -410,6 +469,9 @@ export const CreatePage: React.FC<CreatePageProps> = ({
       {currentStep >= 3 && !pdfSuccess && (
         <div className="flex flex-col gap-10">
           <BookPreviewGrid
+            bookTitle={bookTitle}
+            theme={bookTheme}
+            styleDirection={bookStyleDirection}
             pages={generatedPages}
             onRegeneratePage={handleRegeneratePage}
             onDeletePage={handleDeletePage}
@@ -436,9 +498,9 @@ export const CreatePage: React.FC<CreatePageProps> = ({
             pageCount={generatedPages.length}
             paperSize={paperSize}
             orientation={orientation}
-            bookTitle={prompt.slice(0, 32)}
+            bookTitle={bookTitle || prompt.slice(0, 32)}
             onDownloadPDF={() => {
-              alert(`Downloading printable PDF for "${prompt.slice(0, 24) || 'ColorBook'}" (${generatedPages.length} pages, ${paperSize})`);
+              alert(`Downloading printable PDF for "${bookTitle || 'ColorBook'}" (${generatedPages.length} pages, ${paperSize})`);
             }}
             onDownloadZIP={() => {
               alert(`Downloading ZIP bundle: "${generatedPages.length} black-and-white coloring pages (PNG archive)"`);
@@ -449,12 +511,89 @@ export const CreatePage: React.FC<CreatePageProps> = ({
           {/* Review generated pages below the success card */}
           <div className="pt-6 border-t border-slate-200">
             <BookPreviewGrid
+              bookTitle={bookTitle}
+              theme={bookTheme}
+              styleDirection={bookStyleDirection}
               pages={generatedPages}
               onRegeneratePage={handleRegeneratePage}
               onDeletePage={handleDeletePage}
               onAddPage={handleAddPage}
               notificationMessage={notificationMessage}
             />
+          </div>
+        </div>
+      )}
+
+      {/* API Key Configuration Modal */}
+      {apiKeyNeededModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="relative bg-white rounded-3xl max-w-lg w-full p-6 sm:p-8 shadow-2xl border border-purple-100 flex flex-col gap-5">
+            <div className="flex items-start justify-between gap-3">
+              <div className="w-12 h-12 rounded-2xl bg-amber-100 text-amber-700 flex items-center justify-center shrink-0">
+                <KeyRound className="w-6 h-6" />
+              </div>
+              <button
+                type="button"
+                onClick={() => setApiKeyNeededModal(false)}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-700 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div>
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-800 text-xs font-bold border border-amber-200 mb-2">
+                <span>AI_CONFIGURATION_ERROR</span>
+              </div>
+              <h3 className="text-lg font-bold text-slate-900 leading-tight">
+                Google Gemini API Key Needed
+              </h3>
+              <p className="text-xs text-slate-600 mt-2 leading-relaxed">
+                ColorBook AI connects to Google&apos;s free-tier model <code className="bg-slate-100 px-1 py-0.5 rounded font-mono text-purple-700">gemini-2.5-flash-lite</code> to plan unique book storylines and prompt concepts.
+              </p>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 text-xs text-slate-700 flex flex-col gap-2">
+              <p className="font-semibold text-slate-900">How to configure:</p>
+              <ol className="list-decimal list-inside space-y-1 text-slate-600">
+                <li>
+                  Get a free key from{' '}
+                  <a
+                    href="https://aistudio.google.com/"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-purple-600 font-semibold underline inline-flex items-center gap-0.5"
+                  >
+                    Google AI Studio <ExternalLink className="w-3 h-3" />
+                  </a>
+                </li>
+                <li>
+                  Add to <code className="font-mono bg-white px-1 py-0.5 rounded border border-slate-200">.env</code>:
+                  <div className="font-mono bg-slate-900 text-purple-300 p-2 rounded-lg mt-1 select-all">
+                    GEMINI_API_KEY=your_key_here
+                  </div>
+                </li>
+              </ol>
+            </div>
+
+            <div className="flex flex-col sm:flex-row items-center gap-3 pt-2">
+              <button
+                type="button"
+                onClick={handleProceedWithMock}
+                className="w-full sm:flex-1 py-2.5 px-4 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-xs cursor-pointer transition-colors"
+              >
+                <Sparkles className="w-4 h-4" />
+                <span>Preview with Sample AI Plan</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </button>
+              <button
+                type="button"
+                onClick={() => setApiKeyNeededModal(false)}
+                className="w-full sm:w-auto py-2.5 px-4 rounded-xl border border-slate-200 hover:bg-slate-100 text-slate-700 font-semibold text-xs cursor-pointer transition-colors"
+              >
+                Dismiss
+              </button>
+            </div>
           </div>
         </div>
       )}

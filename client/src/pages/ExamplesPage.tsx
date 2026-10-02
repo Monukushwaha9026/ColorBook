@@ -101,7 +101,7 @@ export const ExamplesPage: React.FC<ExamplesPageProps> = ({ onUsePrompt }) => {
             >
               <div className="aspect-3/4 w-full bg-white p-3 flex items-center justify-center border-b border-slate-100">
                 <img
-                  src={page.imageUrl}
+                  src={page.imageUrl || undefined}
                   alt={page.title}
                   className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-300"
                 />

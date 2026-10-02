@@ -192,7 +192,7 @@ export const MyBooksPage: React.FC<MyBooksPageProps> = ({
                 >
                   <div className="aspect-3/4 w-full bg-white flex items-center justify-center overflow-hidden">
                     <img
-                      src={p.imageUrl}
+                      src={p.imageUrl || undefined}
                       alt={p.title}
                       className="w-full h-full object-contain group-hover:scale-105 transition-transform"
                     />

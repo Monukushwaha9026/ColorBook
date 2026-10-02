@@ -2,7 +2,7 @@ export type AgeGroup = 'kids' | 'children' | 'teens' | 'teen_plus';
 
 export type BookStatus = 'draft' | 'planning' | 'generating' | 'completed' | 'failed' | 'cancelled';
 
-export type PageStatus = 'pending' | 'generating' | 'completed' | 'failed';
+export type PageStatus = 'pending' | 'planned' | 'generating' | 'completed' | 'failed';
 
 export interface CreateBookInput {
   prompt: string;
@@ -17,8 +17,11 @@ export interface BookPageDTO {
   id: string;
   bookId: string;
   pageNumber: number;
+  title?: string | null;
   concept: string;
-  imageUrl: string;
+  visualPrompt?: string | null;
+  difficulty?: 'easy' | 'medium' | 'detailed' | 'intricate' | string | null;
+  imageUrl?: string | null;
   status: PageStatus;
   createdAt: string;
   updatedAt: string;
@@ -26,6 +29,9 @@ export interface BookPageDTO {
 
 export interface BookDTO {
   id: string;
+  title?: string | null;
+  theme?: string | null;
+  styleDirection?: string | null;
   prompt: string;
   ageGroup: AgeGroup;
   pageCount: number;

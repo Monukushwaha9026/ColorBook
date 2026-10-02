@@ -29,6 +29,7 @@ enum BookStatus {
 
 enum PageStatus {
   pending
+  planned
   generating
   completed
   failed
@@ -36,6 +37,9 @@ enum PageStatus {
 
 model Book {
   id                 String      @id @default(uuid())
+  title              String?
+  theme              String?
+  styleDirection     String?
   prompt             String
   ageGroup           AgeGroup    @default(children)
   pageCount          Int         @default(8)
@@ -52,15 +56,18 @@ model Book {
 }
 
 model BookPage {
-  id          String      @id @default(uuid())
-  bookId      String
-  book        Book        @relation(fields: [bookId], references: [id], onDelete: Cascade)
-  pageNumber  Int
-  concept     String
-  imageUrl    String
-  status      PageStatus  @default(pending)
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
+  id           String      @id @default(uuid())
+  bookId       String
+  book         Book        @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  pageNumber   Int
+  title        String?
+  concept      String
+  visualPrompt String?
+  difficulty   String?
+  imageUrl     String?
+  status       PageStatus  @default(planned)
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
 
   @@unique([bookId, pageNumber])
   @@index([bookId])

@@ -368,6 +368,8 @@ export function generateMockBookPages(prompt: string, count: number, bookId: str
   for (let i = 0; i < count; i++) {
     const template = themePool[i % themePool.length];
     const pageNumber = i + 1;
+    const difficulties: Array<'easy' | 'medium' | 'detailed'> = ['easy', 'medium', 'detailed'];
+    const difficulty = difficulties[i % difficulties.length];
 
     pages.push({
       id: `page_${bookId}_${pageNumber}_${Date.now()}`,
@@ -377,7 +379,9 @@ export function generateMockBookPages(prompt: string, count: number, bookId: str
       title: template.concept,
       description: template.description || `Page ${pageNumber} of ${shortTitle}`,
       imageUrl: template.imageUrl,
-      status: 'completed',
+      visualPrompt: `Coloring book line art, pure black lines on pure white background, ${template.concept}, ${template.description}, clean vector linework, enclosed areas for coloring, zero shading, zero grayscale`,
+      difficulty,
+      status: 'planned',
     });
   }
 

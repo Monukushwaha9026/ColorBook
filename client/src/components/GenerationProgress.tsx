@@ -1,10 +1,11 @@
 import React from 'react';
-import { Check, Loader2, FastForward } from 'lucide-react';
+import { Check, Loader2, Sparkles, FastForward } from 'lucide-react';
 
 interface GenerationProgressProps {
   currentPage: number;
   totalPages: number;
   isPlanningDone: boolean;
+  statusMessage?: string;
   onSkip?: () => void;
 }
 
@@ -12,11 +13,12 @@ export const GenerationProgress: React.FC<GenerationProgressProps> = ({
   currentPage,
   totalPages,
   isPlanningDone,
+  statusMessage,
   onSkip,
 }) => {
   const percent = isPlanningDone
-    ? Math.min(100, Math.round(20 + (currentPage / totalPages) * 80))
-    : 15;
+    ? Math.min(100, Math.round(30 + (currentPage / totalPages) * 70))
+    : 20;
 
   return (
     <div className="w-full max-w-2xl mx-auto my-8 p-6 sm:p-8 rounded-3xl bg-white border border-purple-100 shadow-soft text-center animate-in fade-in zoom-in-95 duration-300">
@@ -28,20 +30,25 @@ export const GenerationProgress: React.FC<GenerationProgressProps> = ({
         </div>
 
         <div>
-          <h2 className="text-xl sm:text-2xl font-bold text-slate-900">
-            {isPlanningDone ? 'Creating your coloring book…' : 'Your idea is ready.'}
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-purple-50 text-purple-700 text-xs font-bold border border-purple-200/80 mb-2">
+            <Sparkles className="w-3.5 h-3.5" />
+            <span>Google Gemini AI Planner</span>
+          </div>
+          <h2 className="text-xl sm:text-2xl font-extrabold text-slate-900 tracking-tight">
+            {isPlanningDone ? 'Designing your coloring pages…' : 'Planning your coloring book…'}
           </h2>
           <p className="text-sm text-slate-500 mt-1">
-            {isPlanningDone
-              ? `Creating page ${currentPage} of ${totalPages}…`
-              : 'Planning your coloring book…'}
+            {statusMessage ||
+              (isPlanningDone
+                ? `Structuring page concept ${currentPage} of ${totalPages}…`
+                : 'Formulating unique storylines and age-appropriate line complexity…')}
           </p>
         </div>
       </div>
 
       {/* Steps checklist */}
       <div className="mt-6 max-w-md mx-auto bg-slate-50 rounded-2xl p-4 border border-slate-100 flex flex-col gap-3 text-left">
-        {/* Step 1: Planning */}
+        {/* Step 1: AI Book Planning */}
         <div className="flex items-center justify-between text-sm">
           <div className="flex items-center gap-2.5">
             <div
@@ -58,17 +65,17 @@ export const GenerationProgress: React.FC<GenerationProgressProps> = ({
               )}
             </div>
             <span className={isPlanningDone ? 'text-slate-800 font-semibold' : 'text-purple-700 font-semibold'}>
-              Planning your pages
+              AI Book Planning
             </span>
           </div>
           {isPlanningDone ? (
             <span className="text-xs font-bold text-emerald-600">✓ Complete</span>
           ) : (
-            <span className="text-xs text-purple-600 font-medium">In progress...</span>
+            <span className="text-xs text-purple-600 font-medium">Gemini 2.5 Flash Lite…</span>
           )}
         </div>
 
-        {/* Step 2: Generating pages */}
+        {/* Step 2: Line Art Prompts & Difficulty */}
         <div className="flex items-center justify-between text-sm">
           <div className="flex items-center gap-2.5">
             <div
@@ -82,7 +89,7 @@ export const GenerationProgress: React.FC<GenerationProgressProps> = ({
             </div>
             <span className={isPlanningDone ? 'text-purple-700 font-semibold' : 'text-slate-400 font-medium'}>
               {isPlanningDone
-                ? `Creating page ${currentPage} of ${totalPages}`
+                ? `Calibrating concept ${currentPage} of ${totalPages}`
                 : 'Awaiting page outline'}
             </span>
           </div>
@@ -102,7 +109,7 @@ export const GenerationProgress: React.FC<GenerationProgressProps> = ({
         </div>
       </div>
 
-      {/* Skip button for quick testing */}
+      {/* Fast-forward preview button */}
       {onSkip && (
         <div className="mt-6 pt-4 border-t border-slate-100 flex justify-center">
           <button

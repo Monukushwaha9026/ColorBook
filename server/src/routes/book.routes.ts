@@ -81,5 +81,6 @@ function checkReferenceImageErrors(req: any, _res: any, next: any) {
 bookRouter.get('/', BookController.list);
 bookRouter.get('/:id', BookController.getById);
 bookRouter.post('/', checkReferenceImageErrors, validate(createBookSchema), BookController.create);
+bookRouter.post('/:id/plan', checkReferenceImageErrors, BookController.plan);
 bookRouter.post('/:id/pages', BookController.savePages);
 bookRouter.delete('/:id', BookController.delete);
