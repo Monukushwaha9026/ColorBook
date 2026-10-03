@@ -291,6 +291,21 @@ export const CreatePage: React.FC<CreatePageProps> = ({
     setNotificationMessage('Generation cancelled. You can review and regenerate pages below.');
   };
 
+  // Go back from step 2 (creating process) to step 1 (editing form)
+  const handleBackFromGenerating = async () => {
+    stopPolling();
+    if (createdBookId) {
+      try {
+        await api.cancelGeneration(createdBookId);
+      } catch {
+        // Ignored
+      }
+    }
+    setGenerationPhase('idle');
+    setIsSubmitting(false);
+    setCurrentStep(1);
+  };
+
   // Fallback demo mode when user wants to preview without setting an API key immediately
   const handleProceedWithMock = async () => {
     setApiKeyNeededModal(false);
@@ -530,8 +545,22 @@ export const CreatePage: React.FC<CreatePageProps> = ({
 
   return (
     <div className="w-full max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pb-16">
-      {/* Back to My Books Button when reviewing an existing book */}
-      {onBackToMyBooks && (
+      {/* Back button on Step 2 (creating process) */}
+      {currentStep === 2 && (
+        <div className="pt-4 pb-4">
+          <button
+            type="button"
+            onClick={handleBackFromGenerating}
+            className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-white border border-slate-200 text-xs font-bold text-slate-700 hover:text-purple-700 hover:border-purple-300 hover:bg-purple-50/50 shadow-2xs transition-all cursor-pointer"
+          >
+            <ArrowLeft className="w-3.5 h-3.5" />
+            <span>Back</span>
+          </button>
+        </div>
+      )}
+
+      {/* Back to My Books Button on Step 1 of a reopened book */}
+      {currentStep === 1 && onBackToMyBooks && (
         <div className="pt-4 pb-2">
           <button
             type="button"
@@ -544,27 +573,43 @@ export const CreatePage: React.FC<CreatePageProps> = ({
         </div>
       )}
 
-      {/* 1. Hero Header */}
-      <Hero />
+      {/* Back button on Step 3 (Review) and Step 4 (Download) */}
+      {currentStep >= 3 && (
+        <div className="pt-4 pb-2">
+          <button
+            type="button"
+            onClick={onBackToMyBooks || (() => setCurrentStep(1))}
+            className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-white border border-slate-200 text-xs font-bold text-slate-700 hover:text-purple-700 hover:border-purple-300 hover:bg-purple-50/50 shadow-2xs transition-all cursor-pointer"
+          >
+            <ArrowLeft className="w-3.5 h-3.5" />
+            <span>{onBackToMyBooks ? 'Back to My Books' : 'Back to Edit'}</span>
+          </button>
+        </div>
+      )}
 
-      {/* 2. Step Indicator */}
-      <div className="mb-6">
-        <StepIndicator
-          currentStep={currentStep}
-          onStepClick={(step) => {
-            if (step === 1) setCurrentStep(1);
-            else if (step === 3 && generatedPages.length > 0) setCurrentStep(3);
-            else if (step === 4 && pdfSuccess) setCurrentStep(4);
-          }}
-          canNavigateToStep={(step) => {
-            if (step === 1) return true;
-            if (step === 2) return generationPhase === 'generating';
-            if (step === 3) return generatedPages.length > 0;
-            if (step === 4) return pdfSuccess;
-            return false;
-          }}
-        />
-      </div>
+      {/* 1. Hero Header - ONLY shown on Step 1 */}
+      {currentStep === 1 && <Hero />}
+
+      {/* 2. Step Indicator - shown on Step 1, 3, 4 (hidden on Step 2 where only the back button is shown) */}
+      {currentStep !== 2 && (
+        <div className="mb-6">
+          <StepIndicator
+            currentStep={currentStep}
+            onStepClick={(step) => {
+              if (step === 1) setCurrentStep(1);
+              else if (step === 3 && generatedPages.length > 0) setCurrentStep(3);
+              else if (step === 4 && pdfSuccess) setCurrentStep(4);
+            }}
+            canNavigateToStep={(step) => {
+              if (step === 1) return true;
+              if (step === 2) return generationPhase === 'generating';
+              if (step === 3) return generatedPages.length > 0;
+              if (step === 4) return pdfSuccess;
+              return false;
+            }}
+          />
+        </div>
+      )}
 
       {/* Backend / Global Error Banner */}
       {backendError && (
