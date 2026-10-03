@@ -1,4 +1,6 @@
 import './env.js';
+import fs from 'fs';
+import path from 'path';
 import express from 'express';
 import cors from 'cors';
 import { bookRouter } from './routes/book.routes.js';
@@ -34,12 +36,32 @@ app.use('/api/storage/references', express.static(imageStorage.getReferencesDir(
 app.use('/api', healthRouter);
 app.use('/api/books', bookRouter);
 
+// Serve client build in production
+const clientDistPath = path.resolve(process.cwd(), '../client/dist');
+const altClientDistPath = path.resolve(process.cwd(), 'client/dist');
+const staticDistPath = fs.existsSync(clientDistPath)
+  ? clientDistPath
+  : fs.existsSync(altClientDistPath)
+  ? altClientDistPath
+  : null;
+
+if (staticDistPath) {
+  app.use(express.static(staticDistPath));
+  app.get('*', (req, res, next) => {
+    if (req.path.startsWith('/api') || req.path.startsWith('/storage')) {
+      return next();
+    }
+    res.sendFile(path.join(staticDistPath, 'index.html'));
+  });
+}
+
 // Error handling
 app.use(errorHandler);
 
 app.listen(PORT, () => {
-  console.log(`🚀 ColorBook AI Server listening on http://localhost:${PORT}`);
+  console.log(`🚀 ColorBook AI Server listening on port ${PORT}`);
   console.log(`📡 Health check: http://localhost:${PORT}/api/health`);
   ImageProviderService.validateConfiguration();
   startDailyCleanupScheduler();
 });
+
