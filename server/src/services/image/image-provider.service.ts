@@ -1,7 +1,6 @@
 import type { ImageProvider, ImageGenerationInput, GeneratedImage } from './image-provider.interface.js';
 import { LocalImageProvider } from './local-image-provider.js';
 import { HuggingFaceImageProvider } from './huggingface-image-provider.js';
-import { GeminiImageProvider } from './gemini-image-provider.js';
 import { TestImageProvider } from './test-image-provider.js';
 import { ImageValidator, type ImageValidationResult } from './image-validator.js';
 import { AppError } from '../../middleware/errorHandler.js';
@@ -18,7 +17,7 @@ export class ImageProviderService {
   private static maxAttempts = Number(process.env.MAX_IMAGE_GENERATION_ATTEMPTS || 3);
 
   private static getConfiguredProviderName(): string {
-    return (process.env.IMAGE_PROVIDER || 'local').toLowerCase().trim();
+    return (process.env.IMAGE_PROVIDER || 'huggingface').toLowerCase().trim();
   }
 
   public static getProvider(): ImageProvider {
@@ -33,47 +32,19 @@ export class ImageProviderService {
     this.isCustomProvider = false;
     const providerName = this.getConfiguredProviderName();
 
-    if (providerName === 'gemini') {
-      this.provider = new GeminiImageProvider();
-    } else if (providerName === 'huggingface') {
+    if (providerName === 'huggingface') {
       this.provider = new HuggingFaceImageProvider();
     } else if (providerName === 'test' || providerName === 'free') {
       this.provider = new TestImageProvider();
-    } else {
+    } else if (providerName === 'local') {
       this.provider = new LocalImageProvider();
+    } else {
+      this.provider = new HuggingFaceImageProvider();
     }
   }
 
   static validateConfiguration(): { provider: string; status: 'ok' | 'warning' | 'error'; message: string } {
     const providerName = this.getConfiguredProviderName();
-
-    if (providerName === 'gemini') {
-      const apiKey = process.env.GEMINI_API_KEY?.trim();
-      const model = process.env.GEMINI_IMAGE_MODEL?.trim() || 'gemini-2.5-flash-image';
-      if (!apiKey || apiKey === 'your_gemini_api_key_here') {
-        return {
-          provider: 'gemini',
-          status: 'warning',
-          message: 'Gemini API key is missing. Set GEMINI_API_KEY in .env before generating images.',
-        };
-      }
-      console.log(`[ImageProviderService] Provider: 'gemini' (Primary: ${model})`);
-      return {
-        provider: 'gemini',
-        status: 'ok',
-        message: `Gemini image generation configured with model ${model}`,
-      };
-    }
-
-    if (providerName === 'local') {
-      const apiUrl = process.env.LOCAL_IMAGE_API_URL || 'http://localhost:7860';
-      console.log(`[ImageProviderService] Provider: 'local' (Target: ${apiUrl})`);
-      return {
-        provider: 'local',
-        status: 'ok',
-        message: `Local Stable Diffusion API configured at ${apiUrl}`,
-      };
-    }
 
     if (providerName === 'huggingface') {
       const apiKey = process.env.HUGGINGFACE_API_KEY?.trim();
@@ -95,6 +66,16 @@ export class ImageProviderService {
       };
     }
 
+    if (providerName === 'local') {
+      const apiUrl = process.env.LOCAL_IMAGE_API_URL || 'http://localhost:7860';
+      console.log(`[ImageProviderService] Provider: 'local' (Target: ${apiUrl})`);
+      return {
+        provider: 'local',
+        status: 'ok',
+        message: `Local Stable Diffusion API configured at ${apiUrl}`,
+      };
+    }
+
     if (providerName === 'test' || providerName === 'free') {
       console.log(`[ImageProviderService] Provider: 'test' (TEST / DEVELOPMENT FALLBACK - synthetic line art)`);
       return {
@@ -104,11 +85,11 @@ export class ImageProviderService {
       };
     }
 
-    console.warn(`[ImageProviderService] Unknown provider '${providerName}'. Defaulting to 'local'.`);
+    console.warn(`[ImageProviderService] Unknown provider '${providerName}'. Defaulting to 'huggingface'.`);
     return {
-      provider: providerName,
+      provider: 'huggingface',
       status: 'warning',
-      message: `Unrecognized provider '${providerName}'. Using local provider fallback.`,
+      message: `Unrecognized provider '${providerName}'. Using huggingface provider.`,
     };
   }
 
@@ -168,24 +149,6 @@ export class ImageProviderService {
             err.code === 'HUGGINGFACE_MODEL_NOT_FOUND')
         ) {
           console.warn(`[ImageProviderService] Provider error: ${err.message}`);
-          throw err;
-        } else if (err instanceof AppError && err.code === 'GEMINI_IMAGE_QUOTA_EXHAUSTED') {
-          console.warn(`[ImageProviderService] Gemini Image quota limit reached (free tier limit 0). Attempting fallback to Hugging Face provider...`);
-          try {
-            const fallback = new HuggingFaceImageProvider();
-            const fbResult = await fallback.generateImage(input);
-            const val = ImageValidator.validate(fbResult.buffer);
-            if (val.valid) {
-              console.log(`[ImageProviderService] Successfully generated Page ${input.pageNumber} using fallback provider: huggingface`);
-              return {
-                image: fbResult,
-                attempts,
-                validation: val,
-              };
-            }
-          } catch (fbErr: any) {
-            console.warn(`[ImageProviderService] Fallback also failed: ${fbErr.message}`);
-          }
           throw err;
         } else {
           const msg = err instanceof Error ? err.message : String(err);
