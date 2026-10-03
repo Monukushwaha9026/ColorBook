@@ -10,6 +10,11 @@ interface PageModalProps {
 export const PageModal: React.FC<PageModalProps> = ({ page, onClose }) => {
   const [copied, setCopied] = useState(false);
   const [viewTab, setViewTab] = useState<'preview' | 'prompt'>('preview');
+  const [imageError, setImageError] = useState(false);
+
+  React.useEffect(() => {
+    setImageError(false);
+  }, [page?.imageUrl]);
 
   if (!page) return null;
 
@@ -128,17 +133,26 @@ export const PageModal: React.FC<PageModalProps> = ({ page, onClose }) => {
         <div className="flex-1 overflow-auto p-6 bg-slate-50/50 flex flex-col items-center justify-center">
           {viewTab === 'preview' && (
             <div className="w-full flex flex-col items-center justify-center">
-              {page.imageUrl ? (
+              {page.imageUrl && !imageError ? (
                 <div className="bg-white p-6 rounded-2xl shadow-md border-2 border-slate-300/80 max-w-md w-full">
                   <img
                     src={page.imageUrl}
                     alt={page.title}
+                    onError={() => setImageError(true)}
                     className="w-full h-auto object-contain mx-auto"
                   />
                   <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-400 font-medium">
                     <span>ColorBook AI • Printable Black & White Line Art</span>
                     <span>Page {page.pageNumber}</span>
                   </div>
+                </div>
+              ) : page.imageUrl && imageError ? (
+                <div className="bg-white p-8 rounded-3xl shadow-sm border border-slate-200 max-w-md w-full text-center flex flex-col items-center">
+                  <div className="w-14 h-14 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center mb-3">
+                    <ImageIcon className="w-6 h-6" />
+                  </div>
+                  <h4 className="text-sm font-bold text-slate-800 mb-1">Image Preview Unavailable</h4>
+                  <p className="text-xs text-slate-500 mb-2">Could not load the image from storage.</p>
                 </div>
               ) : (
                 <div className="bg-white p-8 rounded-3xl shadow-sm border border-purple-100 max-w-md w-full text-center flex flex-col items-center">

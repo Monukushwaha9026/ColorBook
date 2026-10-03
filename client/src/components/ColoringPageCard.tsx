@@ -22,6 +22,12 @@ export const ColoringPageCard: React.FC<ColoringPageCardProps> = ({
   const isCompleted = page.status === 'completed' && Boolean(page.imageUrl);
   const isPlanned = page.status === 'planned' || (!isCompleted && !isFailed && !isGenerating);
 
+  const [imageError, setImageError] = React.useState(false);
+
+  React.useEffect(() => {
+    setImageError(false);
+  }, [page.imageUrl]);
+
   const getDifficultyBadge = (difficulty?: string) => {
     switch (difficulty?.toLowerCase()) {
       case 'easy':
@@ -104,25 +110,49 @@ export const ColoringPageCard: React.FC<ColoringPageCardProps> = ({
 
         {/* State 3: Completed Artwork */}
         {!isGenerating && !isFailed && isCompleted && page.imageUrl && (
-          <>
-            <img
-              src={page.imageUrl}
-              alt={page.title}
-              className="w-full h-full object-contain filter contrast-125 transition-transform duration-300 group-hover:scale-102"
-              loading="lazy"
-            />
-            {/* Hover Action Overlay: View Full Details */}
-            <div className="absolute inset-0 bg-purple-900/10 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none z-10">
+          imageError ? (
+            <div className="w-full h-full flex flex-col items-center justify-center p-4 text-center bg-slate-50/80 rounded-xl border border-slate-200">
+              <AlertTriangle className="w-6 h-6 text-amber-500 mb-2" />
+              <span className="text-xs font-bold text-slate-700 mb-1">
+                Preview Unavailable
+              </span>
+              <p className="text-[11px] text-slate-500 line-clamp-2 px-1 mb-3">
+                Artwork could not be loaded.
+              </p>
               <button
                 type="button"
-                onClick={() => onView(page)}
-                className="pointer-events-auto inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-white/95 text-slate-800 text-xs font-bold shadow-md hover:bg-white hover:text-purple-600 cursor-pointer transform translate-y-2 group-hover:translate-y-0 transition-all border border-slate-200/70"
+                onClick={() => {
+                  setImageError(false);
+                  onRegenerate(page.pageNumber);
+                }}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white border border-slate-300 text-slate-700 text-xs font-bold hover:bg-slate-50 shadow-2xs transition-colors cursor-pointer"
               >
-                <Eye className="w-3.5 h-3.5" />
-                <span>Preview Artwork</span>
+                <RefreshCw className="w-3.5 h-3.5" />
+                <span>Retry</span>
               </button>
             </div>
-          </>
+          ) : (
+            <>
+              <img
+                src={page.imageUrl}
+                alt={page.title}
+                onError={() => setImageError(true)}
+                className="w-full h-full object-contain filter contrast-125 transition-transform duration-300 group-hover:scale-102"
+                loading="lazy"
+              />
+              {/* Hover Action Overlay: View Full Details */}
+              <div className="absolute inset-0 bg-purple-900/10 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none z-10">
+                <button
+                  type="button"
+                  onClick={() => onView(page)}
+                  className="pointer-events-auto inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-white/95 text-slate-800 text-xs font-bold shadow-md hover:bg-white hover:text-purple-600 cursor-pointer transform translate-y-2 group-hover:translate-y-0 transition-all border border-slate-200/70"
+                >
+                  <Eye className="w-3.5 h-3.5" />
+                  <span>Preview Artwork</span>
+                </button>
+              </div>
+            </>
+          )
         )}
 
         {/* State 4: Planned / Waiting in Queue */}
