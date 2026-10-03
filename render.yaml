@@ -7,9 +7,7 @@ services:
 
     buildCommand: npm install && npx prisma generate --schema=./prisma/schema.prisma && npm run build
 
-    preDeployCommand: npx prisma migrate deploy
-
-    startCommand: npm start
+    startCommand: npx prisma migrate deploy && npm start
 
     healthCheckPath: /api/health
 
