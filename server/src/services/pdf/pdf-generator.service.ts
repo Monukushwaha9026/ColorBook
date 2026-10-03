@@ -112,7 +112,7 @@ export class PdfGeneratorService {
 
         const writeStream = fsSync.createWriteStream(outputPath);
         writeStream.on('finish', () => resolve());
-        writeStream.on('error', (err) => reject(err));
+        writeStream.on('error', (err: Error) => reject(err));
 
         doc.pipe(writeStream);
 
