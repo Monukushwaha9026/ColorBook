@@ -1,3 +1,6 @@
+import fsSync from 'fs';
+import fs from 'fs/promises';
+import path from 'path';
 import { prisma } from '../lib/prisma.js';
 import type { BookDTO, CreateBookInput, BookPageDTO, BookStatus } from '../types/index.js';
 import { AppError } from '../middleware/errorHandler.js';
@@ -5,10 +8,47 @@ import { BookPlannerService } from './ai/book-planner.service.js';
 import { imageStorage } from './storage/local-image-storage.js';
 import { pdfStorage } from './pdf/pdf-storage.js';
 
-// In-memory fallback repository when PostgreSQL database is not actively running
+// Local storage fallback repository when PostgreSQL database is not actively running
 const memoryBooks: Map<string, BookDTO> = new Map();
 const memoryPages: Map<string, BookPageDTO[]> = new Map();
 let isDbAvailable: boolean | null = null;
+
+const DB_FILE = path.resolve(process.cwd(), 'storage', 'books-db.json');
+
+function restoreDb(): void {
+  try {
+    if (fsSync.existsSync(DB_FILE)) {
+      const raw = fsSync.readFileSync(DB_FILE, 'utf-8');
+      const data = JSON.parse(raw);
+      if (Array.isArray(data.books)) {
+        for (const b of data.books) memoryBooks.set(b.id, b);
+      }
+      if (data.pages && typeof data.pages === 'object') {
+        for (const [id, pages] of Object.entries(data.pages)) {
+          memoryPages.set(id, pages as BookPageDTO[]);
+        }
+      }
+    }
+  } catch {
+    // Non-fatal if parsing fails
+  }
+}
+
+async function persistDb(): Promise<void> {
+  try {
+    const dir = path.dirname(DB_FILE);
+    await fs.mkdir(dir, { recursive: true });
+    const payload = {
+      books: Array.from(memoryBooks.values()),
+      pages: Object.fromEntries(memoryPages.entries()),
+    };
+    await fs.writeFile(DB_FILE, JSON.stringify(payload, null, 2), 'utf-8');
+  } catch {
+    // Non-fatal
+  }
+}
+
+restoreDb();
 
 async function tryDb<T>(op: () => Promise<T>, fallback: () => Promise<T> | T): Promise<T> {
   if (isDbAvailable === false) {
@@ -63,6 +103,7 @@ export class BookService {
     };
 
     memoryBooks.set(id, newBook);
+    persistDb().catch(() => {});
 
     return tryDb(
       async () => {
@@ -130,6 +171,7 @@ export class BookService {
     if (book) {
       book.status = status;
       book.updatedAt = new Date().toISOString();
+      persistDb().catch(() => {});
     }
 
     await tryDb(
@@ -162,6 +204,7 @@ export class BookService {
       if (data.paperSize !== undefined) book.paperSize = data.paperSize;
       if (data.orientation !== undefined) book.orientation = data.orientation;
       book.updatedAt = new Date().toISOString();
+      persistDb().catch(() => {});
     }
 
     await tryDb(
@@ -220,6 +263,7 @@ export class BookService {
       book.pages = pages.filter((p) => p.status !== 'deleted');
       book.completedPages = book.pages.filter((p) => p.status === 'completed').length;
     }
+    persistDb().catch(() => {});
 
     await tryDb(
       async () => {
@@ -294,6 +338,7 @@ export class BookService {
       book.completedPages = activePages.filter((p) => p.status === 'completed').length;
       memoryBooks.set(bookId, book);
     }
+    persistDb().catch(() => {});
 
     await tryDb(
       async () => {
@@ -399,6 +444,7 @@ export class BookService {
       book.status = 'completed';
       book.pages = pages;
     }
+    persistDb().catch(() => {});
 
     await tryDb(
       async () => {
@@ -504,6 +550,7 @@ export class BookService {
 
     memoryBooks.set(bookId, book);
     memoryPages.set(bookId, plannedPages);
+    persistDb().catch(() => {});
 
     await tryDb(
       async () => {
@@ -553,6 +600,7 @@ export class BookService {
     );
     memoryPages.delete(id);
     const deleted = memoryBooks.delete(id);
+    persistDb().catch(() => {});
 
     // Thorough cleanup of all local disk storage for the deleted book
     await imageStorage.deleteReferenceImage(id);
