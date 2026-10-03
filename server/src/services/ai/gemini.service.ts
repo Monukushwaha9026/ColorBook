@@ -103,8 +103,14 @@ Ensure each page has a distinct title, concept, visualPrompt, and age-appropriat
           throw new AppError('Gemini API key is invalid or expired.', 401, 'AI_CONFIGURATION_ERROR');
         }
 
-        if (message.includes('404') || message.includes('no longer available') || message.includes('NOT_FOUND')) {
-          console.warn(`[GeminiService] Model '${model}' not available (${message.slice(0, 80)}). Trying next candidate model...`);
+        if (
+          message.includes('404') ||
+          message.includes('no longer available') ||
+          message.includes('NOT_FOUND') ||
+          message.includes('503') ||
+          message.includes('high demand')
+        ) {
+          console.warn(`[GeminiService] Model '${model}' skipped (${message.slice(0, 80)}). Trying next candidate model...`);
           continue;
         }
 

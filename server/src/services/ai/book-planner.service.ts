@@ -37,11 +37,9 @@ export class BookPlannerService {
         console.log(`[AI] Book plan generated successfully in ${durationMs}ms: "${plan.title}" (${plan.pages.length} pages)`);
         return plan;
       } catch (err: unknown) {
-        if (err instanceof AppError && err.code === 'AI_CONFIGURATION_ERROR') {
-          console.log(`[BookPlannerService] Gemini API key not configured; using intelligent built-in concept planner for prompt: "${input.prompt}"`);
-          return this.generateFallbackPlan(input);
-        }
-        throw err;
+        const msg = err instanceof Error ? err.message : String(err);
+        console.warn(`[BookPlannerService] Primary AI planner failed (${msg}). Seamlessly generating cohesive coloring book plan from prompt...`);
+        return this.generateFallbackPlan(input);
       }
     } finally {
       this.inFlightPlans.delete(lockKey);
