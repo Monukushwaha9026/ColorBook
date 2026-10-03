@@ -1,6 +1,7 @@
 import type { ImageProvider, ImageGenerationInput, GeneratedImage } from './image-provider.interface.js';
 import { LocalImageProvider } from './local-image-provider.js';
 import { HuggingFaceImageProvider } from './huggingface-image-provider.js';
+import { GeminiImageProvider } from './gemini-image-provider.js';
 import { TestImageProvider } from './test-image-provider.js';
 import { ImageValidator, type ImageValidationResult } from './image-validator.js';
 import { AppError } from '../../middleware/errorHandler.js';
@@ -32,7 +33,9 @@ export class ImageProviderService {
     this.isCustomProvider = false;
     const providerName = this.getConfiguredProviderName();
 
-    if (providerName === 'huggingface') {
+    if (providerName === 'gemini') {
+      this.provider = new GeminiImageProvider();
+    } else if (providerName === 'huggingface') {
       this.provider = new HuggingFaceImageProvider();
     } else if (providerName === 'test' || providerName === 'free') {
       this.provider = new TestImageProvider();
@@ -43,6 +46,24 @@ export class ImageProviderService {
 
   static validateConfiguration(): { provider: string; status: 'ok' | 'warning' | 'error'; message: string } {
     const providerName = this.getConfiguredProviderName();
+
+    if (providerName === 'gemini') {
+      const apiKey = process.env.GEMINI_API_KEY?.trim();
+      const model = process.env.GEMINI_IMAGE_MODEL?.trim() || 'gemini-2.5-flash-image';
+      if (!apiKey || apiKey === 'your_gemini_api_key_here') {
+        return {
+          provider: 'gemini',
+          status: 'warning',
+          message: 'Gemini API key is missing. Set GEMINI_API_KEY in .env before generating images.',
+        };
+      }
+      console.log(`[ImageProviderService] Provider: 'gemini' (Primary: ${model})`);
+      return {
+        provider: 'gemini',
+        status: 'ok',
+        message: `Gemini image generation configured with model ${model}`,
+      };
+    }
 
     if (providerName === 'local') {
       const apiUrl = process.env.LOCAL_IMAGE_API_URL || 'http://localhost:7860';
@@ -147,6 +168,24 @@ export class ImageProviderService {
             err.code === 'HUGGINGFACE_MODEL_NOT_FOUND')
         ) {
           console.warn(`[ImageProviderService] Provider error: ${err.message}`);
+          throw err;
+        } else if (err instanceof AppError && err.code === 'GEMINI_IMAGE_QUOTA_EXHAUSTED') {
+          console.warn(`[ImageProviderService] Gemini Image quota limit reached (free tier limit 0). Attempting fallback to Hugging Face provider...`);
+          try {
+            const fallback = new HuggingFaceImageProvider();
+            const fbResult = await fallback.generateImage(input);
+            const val = ImageValidator.validate(fbResult.buffer);
+            if (val.valid) {
+              console.log(`[ImageProviderService] Successfully generated Page ${input.pageNumber} using fallback provider: huggingface`);
+              return {
+                image: fbResult,
+                attempts,
+                validation: val,
+              };
+            }
+          } catch (fbErr: any) {
+            console.warn(`[ImageProviderService] Fallback also failed: ${fbErr.message}`);
+          }
           throw err;
         } else {
           const msg = err instanceof Error ? err.message : String(err);

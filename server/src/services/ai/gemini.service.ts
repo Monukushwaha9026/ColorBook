@@ -10,7 +10,7 @@ export class GeminiService implements AIProvider {
   private modelName: string;
 
   constructor() {
-    this.modelName = process.env.GEMINI_TEXT_MODEL || 'gemini-2.5-flash-lite';
+    this.modelName = process.env.GEMINI_TEXT_MODEL || 'gemini-3.5-flash-lite';
   }
 
   private getClient(): GoogleGenAI {
