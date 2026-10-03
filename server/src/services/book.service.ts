@@ -70,7 +70,7 @@ export class BookService {
    */
   static async createBook(input: CreateBookInput): Promise<BookDTO> {
     const id = `book_${Math.random().toString(36).substring(2, 8)}${Date.now().toString(36)}`;
-    const now = new Date().toISOString();
+    const now = input.createdAt || new Date().toISOString();
 
     // If referenceImage is provided as a data URL or path, normalize reference path
     let referenceImageUrl: string | null = null;
@@ -119,6 +119,7 @@ export class BookService {
             orientation: newBook.orientation || 'PORTRAIT',
             pdfUrl: null,
             pdfStatus: 'not_started',
+            createdAt: new Date(newBook.createdAt),
           },
           include: { pages: true },
         });
@@ -430,6 +431,57 @@ export class BookService {
             };
           })
           .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      }
+    );
+  }
+
+  /**
+   * Find books created within a specific timestamp range (inclusive)
+   */
+  static async findBooksByDateRange(start: Date, end: Date): Promise<BookDTO[]> {
+    return tryDb(
+      async () => {
+        const dbBooks = await prisma.book.findMany({
+          where: {
+            createdAt: {
+              gte: start,
+              lte: end,
+            },
+          },
+          include: { pages: { orderBy: { pageNumber: 'asc' } } },
+          orderBy: { createdAt: 'desc' },
+        });
+        return (dbBooks || []).map((b) => {
+          const activePages = (b.pages || []).filter((p) => p.status !== 'deleted');
+          const completedPages = activePages.filter((p) => p.status === 'completed').length;
+          const coverImage = activePages.find((p) => p.imageUrl)?.imageUrl || null;
+          return {
+            ...b,
+            pages: activePages,
+            completedPages,
+            coverImage,
+          };
+        }) as unknown as BookDTO[];
+      },
+      () => {
+        const matching: BookDTO[] = [];
+        for (const [id, book] of memoryBooks.entries()) {
+          const created = new Date(book.createdAt);
+          if (created >= start && created <= end) {
+            const pages = (memoryPages.get(id) || []).filter((p) => p.status !== 'deleted');
+            const completedPages = pages.filter((p) => p.status === 'completed').length;
+            const coverImage = pages.find((p) => p.imageUrl)?.imageUrl || null;
+            matching.push({
+              ...book,
+              pages,
+              completedPages,
+              coverImage,
+            });
+          }
+        }
+        return matching.sort(
+          (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        );
       }
     );
   }

@@ -15,11 +15,13 @@ dist-ssr
 
 # Environment variables
 .env
-.env.production
+.env.*
+!.env.example
 
 # Storage
 storage/
 server/storage/
+client/storage/
 
 # Editor directories and files
 .vscode/*

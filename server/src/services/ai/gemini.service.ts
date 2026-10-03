@@ -63,38 +63,48 @@ Ensure each page has a distinct title, concept, visualPrompt, and age-appropriat
       text: promptUserInstruction,
     });
 
-    try {
-      const response = await ai.models.generateContent({
-        model: this.modelName,
-        contents,
-        config: {
-          systemInstruction: COLORING_BOOK_SYSTEM_PROMPT,
-          responseMimeType: 'application/json',
-          temperature: 0.7,
-        },
-      });
+    let lastError: unknown = null;
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      try {
+        const response = await ai.models.generateContent({
+          model: this.modelName,
+          contents,
+          config: {
+            systemInstruction: COLORING_BOOK_SYSTEM_PROMPT,
+            responseMimeType: 'application/json',
+            temperature: 0.7,
+          },
+        });
 
-      const responseText = response.text;
-      if (!responseText) {
-        throw new AppError('No content returned from Gemini API.', 502, 'AI_EMPTY_RESPONSE');
+        const responseText = response.text;
+        if (!responseText) {
+          throw new AppError('No content returned from Gemini API.', 502, 'AI_EMPTY_RESPONSE');
+        }
+
+        const parsed = BookPlanValidator.extractJsonFromText(responseText);
+        const conformedPlan = BookPlanValidator.validateAndConformPlan(parsed, input);
+
+        return conformedPlan;
+      } catch (err: unknown) {
+        lastError = err;
+        if (err instanceof AppError && err.code === 'AI_CONFIGURATION_ERROR') {
+          throw err;
+        }
+
+        const message = err instanceof Error ? err.message : String(err);
+        if (message.includes('API key not valid') || message.includes('API_KEY_INVALID') || message.includes('403 Forbidden')) {
+          throw new AppError('Gemini API key is invalid or expired.', 401, 'AI_CONFIGURATION_ERROR');
+        }
+
+        if (attempt < 2) {
+          console.warn(`[GeminiService] Book planning attempt 1 failed (${message}). Retrying once...`);
+          continue;
+        }
       }
-
-      const parsed = BookPlanValidator.extractJsonFromText(responseText);
-      const conformedPlan = BookPlanValidator.validateAndConformPlan(parsed, input);
-
-      return conformedPlan;
-    } catch (err: unknown) {
-      if (err instanceof AppError) {
-        throw err;
-      }
-
-      const message = err instanceof Error ? err.message : String(err);
-      if (message.includes('API key not valid') || message.includes('API_KEY_INVALID') || message.includes('403 Forbidden')) {
-        throw new AppError('Gemini API key is invalid or expired.', 401, 'AI_CONFIGURATION_ERROR');
-      }
-
-      console.error('[GeminiService Error]:', err);
-      throw new AppError(`Failed to generate book plan: ${message}`, 502, 'AI_GENERATION_FAILED');
     }
+
+    console.error('[GeminiService Error]:', lastError);
+    const msg = lastError instanceof Error ? lastError.message : String(lastError);
+    throw new AppError(`Failed to generate book plan: ${msg}`, 502, 'AI_GENERATION_FAILED');
   }
 }

@@ -11,6 +11,7 @@ export interface CreateBookInput {
   referenceImage?: string | null;
   paperSize?: string;
   orientation?: string;
+  createdAt?: string;
 }
 
 export interface BookPageDTO {
@@ -39,6 +40,7 @@ export interface BookDTO {
   ageGroup: AgeGroup;
   pageCount: number;
   completedPages?: number;
+  coverImage?: string | null;
   referenceImageUrl?: string | null;
   status: BookStatus;
   paperSize?: string;

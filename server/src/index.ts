@@ -7,6 +7,7 @@ import { errorHandler } from './middleware/errorHandler.js';
 import { imageStorage } from './services/storage/local-image-storage.js';
 import { pdfStorage } from './services/pdf/pdf-storage.js';
 import { ImageProviderService } from './services/image/image-provider.service.js';
+import { startDailyCleanupScheduler } from './services/cleanup/daily-cleanup.service.js';
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -40,4 +41,5 @@ app.listen(PORT, () => {
   console.log(`🚀 ColorBook AI Server listening on http://localhost:${PORT}`);
   console.log(`📡 Health check: http://localhost:${PORT}/api/health`);
   ImageProviderService.validateConfiguration();
+  startDailyCleanupScheduler();
 });

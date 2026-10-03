@@ -48,8 +48,18 @@ export class BookPlanValidator {
 
     try {
       return JSON.parse(cleaned);
-    } catch (err) {
-      throw new Error(`Failed to parse AI JSON response: ${(err as Error).message}`);
+    } catch {
+      // Attempt repair of common LLM JSON defects:
+      // 1. Unclosed trailing decimals (e.g. "1." -> "1.0")
+      // 2. Trailing commas before closing braces/brackets
+      const repaired = cleaned
+        .replace(/(\d+)\.(?=[,\s}\]])/g, '$1.0')
+        .replace(/,\s*([}\]])/g, '$1');
+      try {
+        return JSON.parse(repaired);
+      } catch (err) {
+        throw new Error(`Failed to parse AI JSON response: ${(err as Error).message}`);
+      }
     }
   }
 
