@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { X, Printer, Download, Sparkles, Copy, Check, Code2, Image as ImageIcon } from 'lucide-react';
 import type { ColoringPageItem } from '../types';
+import { getAssetUrl } from '../lib/api';
 
 interface PageModalProps {
   page: ColoringPageItem | null;
@@ -42,7 +43,7 @@ export const PageModal: React.FC<PageModalProps> = ({ page, onClose }) => {
           </style>
         </head>
         <body>
-          <img src="${page.imageUrl}" onload="window.print(); window.close();" />
+          <img src="${getAssetUrl(page.imageUrl)}" onload="window.print(); window.close();" />
         </body>
       </html>
     `);
@@ -136,7 +137,7 @@ export const PageModal: React.FC<PageModalProps> = ({ page, onClose }) => {
               {page.imageUrl && !imageError ? (
                 <div className="bg-white p-6 rounded-2xl shadow-md border-2 border-slate-300/80 max-w-md w-full">
                   <img
-                    src={page.imageUrl}
+                    src={getAssetUrl(page.imageUrl)}
                     alt={page.title}
                     onError={() => setImageError(true)}
                     className="w-full h-auto object-contain mx-auto"
@@ -238,7 +239,7 @@ export const PageModal: React.FC<PageModalProps> = ({ page, onClose }) => {
           </span>
           {page.imageUrl && (
             <a
-              href={page.imageUrl}
+              href={getAssetUrl(page.imageUrl)}
               download={`colorbook-page-${page.pageNumber}.png`}
               className="inline-flex items-center gap-1 text-purple-600 font-semibold hover:underline"
             >

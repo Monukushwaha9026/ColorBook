@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { BookOpen, Calendar, Download, Plus, Trash2, Loader2, AlertCircle, RefreshCw, FileText, Check, Clock, AlertTriangle } from 'lucide-react';
 import { EmptyState } from '../components/EmptyState';
-import { api, ApiClientError } from '../lib/api';
+import { api, ApiClientError, getAssetUrl } from '../lib/api';
 import type { Book } from '../types';
 
 interface MyBooksPageProps {
@@ -176,7 +176,8 @@ export const MyBooksPage: React.FC<MyBooksPageProps> = ({
             const isStalePdf = book.pdfStatus === 'stale';
             const isGenerating = book.status === 'generating';
             const isFailed = book.status === 'failed';
-            const thumbnail = book.coverImage || book.pages?.[0]?.imageUrl || '/illustrations/icon-book-3d.png';
+            const rawThumbnail = book.coverImage || book.pages?.[0]?.imageUrl || '/illustrations/icon-book-3d.png';
+            const thumbnail = getAssetUrl(rawThumbnail);
 
             return (
               <div

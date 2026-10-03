@@ -191,3 +191,21 @@ export const api = {
     return `${API_BASE_URL}/books/${bookId}/pdf`;
   },
 };
+
+/**
+ * Resolves a storage or asset URL safely across dev and production environments.
+ * In development, ensures requests target the backend port directly to bypass any stale browser SPA caches.
+ */
+export function getAssetUrl(url?: string | null): string {
+  if (!url) return '';
+  if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:')) {
+    return url;
+  }
+  if (url.startsWith('/storage')) {
+    const isDev = typeof window !== 'undefined' && (window.location.port === '5173' || window.location.hostname === 'localhost');
+    if (isDev) {
+      return `http://localhost:5000${url}`;
+    }
+  }
+  return url;
+}

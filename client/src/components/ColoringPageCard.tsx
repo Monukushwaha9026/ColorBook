@@ -1,6 +1,7 @@
 import React from 'react';
 import { RefreshCw, Trash2, Eye, Sparkles, Loader2, Code2, AlertTriangle, Clock } from 'lucide-react';
 import type { ColoringPageItem } from '../types';
+import { getAssetUrl } from '../lib/api';
 
 interface ColoringPageCardProps {
   page: ColoringPageItem;
@@ -134,7 +135,7 @@ export const ColoringPageCard: React.FC<ColoringPageCardProps> = ({
           ) : (
             <>
               <img
-                src={page.imageUrl}
+                src={getAssetUrl(page.imageUrl)}
                 alt={page.title}
                 onError={() => setImageError(true)}
                 className="w-full h-full object-contain filter contrast-125 transition-transform duration-300 group-hover:scale-102"
