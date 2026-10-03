@@ -12,15 +12,26 @@ export interface ValidatedImageResult {
 }
 
 export class ImageProviderService {
-  private static provider: ImageProvider = new LocalImageProvider();
+  private static provider: ImageProvider | null = null;
+  private static isCustomProvider = false;
   private static maxAttempts = Number(process.env.MAX_IMAGE_GENERATION_ATTEMPTS || 3);
 
-  static {
-    this.refreshProvider();
+  private static getConfiguredProviderName(): string {
+    return (process.env.IMAGE_PROVIDER || 'local').toLowerCase().trim();
+  }
+
+  public static getProvider(): ImageProvider {
+    const configuredName = this.getConfiguredProviderName();
+    if (!this.provider || (!this.isCustomProvider && this.provider.name !== configuredName)) {
+      this.refreshProvider();
+    }
+    return this.provider!;
   }
 
   static refreshProvider(): void {
-    const providerName = (process.env.IMAGE_PROVIDER || 'local').toLowerCase().trim();
+    this.isCustomProvider = false;
+    const providerName = this.getConfiguredProviderName();
+
     if (providerName === 'huggingface') {
       this.provider = new HuggingFaceImageProvider();
     } else if (providerName === 'test' || providerName === 'free') {
@@ -31,7 +42,7 @@ export class ImageProviderService {
   }
 
   static validateConfiguration(): { provider: string; status: 'ok' | 'warning' | 'error'; message: string } {
-    const providerName = (process.env.IMAGE_PROVIDER || 'local').toLowerCase().trim();
+    const providerName = this.getConfiguredProviderName();
 
     if (providerName === 'local') {
       const apiUrl = process.env.LOCAL_IMAGE_API_URL || 'http://localhost:7860';
@@ -82,10 +93,11 @@ export class ImageProviderService {
 
   static setProvider(customProvider: ImageProvider): void {
     this.provider = customProvider;
+    this.isCustomProvider = true;
   }
 
   static getProviderName(): string {
-    return this.provider.name;
+    return this.getProvider().name;
   }
 
   /**
@@ -98,10 +110,11 @@ export class ImageProviderService {
 
     while (attempts < maxAttempts) {
       attempts++;
-      console.log(`[ImageProviderService] Generating image for Page ${input.pageNumber} (Attempt ${attempts}/${maxAttempts}) using provider: ${this.provider.name}`);
+      const currentProvider = this.getProvider();
+      console.log(`[ImageProviderService] Generating image for Page ${input.pageNumber} (Attempt ${attempts}/${maxAttempts}) using provider: ${currentProvider.name}`);
 
       try {
-        const generated = await this.provider.generateImage({
+        const generated = await currentProvider.generateImage({
           ...input,
           variationSeed: (input.variationSeed || 1000) + attempts * 7919, // Fresh seed for retries
         });
@@ -122,7 +135,6 @@ export class ImageProviderService {
         console.warn(`[ImageProviderService] ${reason}`);
         failureReasons.push(reason);
 
-        // If local provider is unavailable, and not on final attempt, check if fallback is possible
         if (attempts >= maxAttempts) {
           break;
         }
@@ -138,6 +150,7 @@ export class ImageProviderService {
           throw err;
         } else {
           const msg = err instanceof Error ? err.message : String(err);
+          console.warn(`[ImageProviderService] Attempt ${attempts} error: ${msg}`);
           failureReasons.push(`Attempt ${attempts} error: ${msg}`);
         }
       }

@@ -29,132 +29,138 @@ export class HuggingFaceImageProvider implements ImageProvider {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 60000); // 60s timeout
 
-    // Hugging Face router inference endpoint
-    const endpoint = `https://router.huggingface.co/hf-inference/models/${encodeURIComponent(this.model)}`;
+    // Hugging Face routes modern diffusion models (like FLUX.1) via partner inference providers
+    const customProvider = process.env.HUGGINGFACE_INFERENCE_PROVIDER?.trim();
+    const candidateProviders = Array.from(new Set([customProvider || 'nscale', 'together', 'fal-ai'])).filter(Boolean);
 
-    console.log(`[HuggingFaceImageProvider] Requesting image from model: ${this.model} (Seed: ${seed})`);
+    console.log(
+      `[HuggingFaceImageProvider] Initiating generation for model: ${this.model} (Seed: ${seed}, Candidate Providers: ${candidateProviders.join(', ')})`
+    );
+
+    let lastError: Error | null = null;
 
     try {
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          'Content-Type': 'application/json',
-          Accept: 'image/png, image/jpeg, */*',
-        },
-        body: JSON.stringify({
-          inputs: prompt,
-          parameters: {
-            negative_prompt: negativePrompt,
-            seed,
-          },
-        }),
-        signal: controller.signal,
-      });
+      for (const provider of candidateProviders) {
+        const endpoint = `https://router.huggingface.co/${provider}/v1/images/generations`;
+        console.log(`[HuggingFaceImageProvider] Attempting generation via provider '${provider}'...`);
 
+        try {
+          const response = await fetch(endpoint, {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${apiKey}`,
+              'Content-Type': 'application/json',
+              Accept: 'application/json, image/png, image/jpeg, */*',
+            },
+            body: JSON.stringify({
+              prompt,
+              negative_prompt: negativePrompt,
+              model: this.model,
+              response_format: 'b64_json',
+              width: 1024,
+              height: 1024,
+              seed,
+            }),
+            signal: controller.signal,
+          });
+
+          if (response.status === 401 || response.status === 403) {
+            throw new AppError(
+              'Hugging Face authentication failed: invalid or expired API key. Please verify your HUGGINGFACE_API_KEY.',
+              401,
+              'HUGGINGFACE_AUTH_ERROR'
+            );
+          }
+
+          if (response.status === 429) {
+            throw new AppError(
+              'Hugging Face rate limit or quota exceeded. Free tier inference is subject to provider rate limits.',
+              429,
+              'HUGGINGFACE_RATE_LIMIT'
+            );
+          }
+
+          if (response.status === 404) {
+            console.warn(`[HuggingFaceImageProvider] Model '${this.model}' not found on provider '${provider}' (404)`);
+            lastError = new AppError(
+              `Hugging Face model "${this.model}" was not found or is inaccessible on provider ${provider}.`,
+              404,
+              'HUGGINGFACE_MODEL_NOT_FOUND'
+            );
+            continue;
+          }
+
+          if (!response.ok) {
+            let errText = `HTTP ${response.status}`;
+            try {
+              const errJson: any = await response.json();
+              if (errJson?.error) {
+                errText = typeof errJson.error === 'string' ? errJson.error : JSON.stringify(errJson.error);
+              }
+            } catch {
+              try {
+                errText = (await response.text()).slice(0, 150);
+              } catch {
+                // Ignore
+              }
+            }
+
+            console.warn(`[HuggingFaceImageProvider] Provider '${provider}' returned HTTP ${response.status}: ${errText}`);
+            lastError = new AppError(`Hugging Face (${provider}) failed: ${errText}`, response.status, 'HUGGINGFACE_API_ERROR');
+            continue;
+          }
+
+          // Successful response - could be b64_json or binary
+          const contentType = response.headers.get('content-type') || '';
+          let imageBuffer: Buffer;
+
+          if (contentType.includes('application/json')) {
+            const data: any = await response.json();
+            const b64 = data?.data?.[0]?.b64_json;
+            if (!b64) {
+              console.warn(`[HuggingFaceImageProvider] Provider '${provider}' response missing b64_json payload`);
+              continue;
+            }
+            imageBuffer = Buffer.from(b64, 'base64');
+          } else {
+            const arrayBuf = await response.arrayBuffer();
+            imageBuffer = Buffer.from(arrayBuf);
+          }
+
+          if (imageBuffer.length < 512) {
+            console.warn(`[HuggingFaceImageProvider] Provider '${provider}' returned truncated buffer (${imageBuffer.length} bytes)`);
+            continue;
+          }
+
+          clearTimeout(timeoutId);
+          console.log(`[HuggingFaceImageProvider] Image generated successfully via provider '${provider}' (${imageBuffer.length} bytes)`);
+
+          return {
+            buffer: imageBuffer,
+            mimeType: 'image/png',
+            width: 1024,
+            height: 1024,
+          };
+        } catch (innerErr: unknown) {
+          if (innerErr instanceof AppError && (innerErr.code === 'HUGGINGFACE_AUTH_ERROR' || innerErr.code === 'HUGGINGFACE_RATE_LIMIT')) {
+            throw innerErr;
+          }
+          const msg = innerErr instanceof Error ? innerErr.message : String(innerErr);
+          console.warn(`[HuggingFaceImageProvider] Provider '${provider}' connection error: ${msg}`);
+          lastError = innerErr instanceof Error ? innerErr : new Error(msg);
+        }
+      }
+
+      // If loop finished without returning
       clearTimeout(timeoutId);
-
-      if (response.status === 401 || response.status === 403) {
-        throw new AppError(
-          'Hugging Face authentication failed: invalid or expired API key. Please verify your HUGGINGFACE_API_KEY.',
-          401,
-          'HUGGINGFACE_AUTH_ERROR'
-        );
+      if (lastError instanceof AppError) {
+        throw lastError;
       }
-
-      if (response.status === 410) {
-        throw new AppError(
-          `Hugging Face model "${this.model}" is no longer supported on the free serverless Inference API (HTTP 410: Deprecated by provider). Hugging Face requires a dedicated Inference Endpoint or third-party inference provider for FLUX/SDXL diffusion models.`,
-          410,
-          'HUGGINGFACE_MODEL_DEPRECATED'
-        );
-      }
-
-      if (response.status === 400) {
-        let errDetail = 'Model not supported by provider hf-inference.';
-        try {
-          const errJson = (await response.json()) as { error?: string };
-          if (errJson.error) errDetail = errJson.error;
-        } catch {
-          // ignore
-        }
-        throw new AppError(
-          `Hugging Face model "${this.model}" is not available on free serverless inference: ${errDetail}. Hugging Face now routes diffusion models through dedicated or partner inference endpoints.`,
-          400,
-          'HUGGINGFACE_MODEL_UNSUPPORTED'
-        );
-      }
-
-      if (response.status === 404) {
-        throw new AppError(
-          `Hugging Face model "${this.model}" was not found or is inaccessible with your account permissions.`,
-          404,
-          'HUGGINGFACE_MODEL_NOT_FOUND'
-        );
-      }
-
-      if (response.status === 429) {
-        throw new AppError(
-          'Hugging Face rate limit or quota exceeded. Free tier inference is subject to provider rate limits.',
-          429,
-          'HUGGINGFACE_RATE_LIMIT'
-        );
-      }
-
-      if (response.status === 503) {
-        let waitTime = 20;
-        try {
-          const errJson = (await response.json()) as { estimated_time?: number };
-          if (errJson.estimated_time) waitTime = Math.ceil(errJson.estimated_time);
-        } catch {
-          // ignore
-        }
-        throw new AppError(
-          `Hugging Face model "${this.model}" is currently loading (estimated wait: ${waitTime}s). Please retry in a moment.`,
-          503,
-          'HUGGINGFACE_MODEL_LOADING'
-        );
-      }
-
-      if (!response.ok) {
-        let errMessage = `HTTP ${response.status}`;
-        try {
-          const errJson = (await response.json()) as { error?: string | string[] };
-          if (errJson.error) {
-            errMessage = Array.isArray(errJson.error) ? errJson.error.join(', ') : errJson.error;
-          }
-        } catch {
-          try {
-            errMessage = await response.text();
-          } catch {
-            // ignore
-          }
-        }
-        throw new AppError(
-          `Hugging Face generation failed (${response.status}): ${errMessage}`,
-          response.status >= 500 ? 502 : response.status,
-          'HUGGINGFACE_API_ERROR'
-        );
-      }
-
-      const contentType = response.headers.get('content-type') || 'image/png';
-      const arrayBuffer = await response.arrayBuffer();
-      const buffer = Buffer.from(arrayBuffer);
-
-      if (buffer.length < 512) {
-        throw new AppError(
-          'Hugging Face returned an empty or truncated image buffer.',
-          502,
-          'HUGGINGFACE_EMPTY_RESPONSE'
-        );
-      }
-
-      return {
-        buffer,
-        mimeType: contentType.includes('jpeg') ? 'image/jpeg' : 'image/png',
-        width: 768,
-        height: 1024,
-      };
+      throw new AppError(
+        `All Hugging Face candidate providers (${candidateProviders.join(', ')}) failed for model ${this.model}. ${lastError?.message || ''}`,
+        502,
+        'HUGGINGFACE_API_ERROR'
+      );
     } catch (err: unknown) {
       clearTimeout(timeoutId);
 
@@ -171,7 +177,7 @@ export class HuggingFaceImageProvider implements ImageProvider {
         );
       }
 
-      console.warn(`[HuggingFaceImageProvider] Network error: ${message}`);
+      console.warn(`[HuggingFaceImageProvider] Request failed: ${message}`);
       throw new AppError(
         `Failed to communicate with Hugging Face Inference API: ${message}`,
         502,

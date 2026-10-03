@@ -1,17 +1,12 @@
+import './env.js';
 import express from 'express';
 import cors from 'cors';
-import path from 'path';
-import dotenv from 'dotenv';
 import { bookRouter } from './routes/book.routes.js';
 import { healthRouter } from './routes/health.routes.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import { imageStorage } from './services/storage/local-image-storage.js';
 import { pdfStorage } from './services/pdf/pdf-storage.js';
 import { ImageProviderService } from './services/image/image-provider.service.js';
-
-dotenv.config();
-dotenv.config({ path: path.resolve(process.cwd(), '../.env') });
-dotenv.config({ path: path.resolve(process.cwd(), '.env') });
 
 const app = express();
 const PORT = process.env.PORT || 5000;
