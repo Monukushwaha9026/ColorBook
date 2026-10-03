@@ -176,6 +176,15 @@ export const api = {
   },
 
   /**
+   * Delete a book by ID
+   */
+  async deleteBook(bookId: string): Promise<{ success: boolean; deleted: boolean }> {
+    return request<{ success: boolean; deleted: boolean }>(`/books/${bookId}`, {
+      method: 'DELETE',
+    });
+  },
+
+  /**
    * Get direct download URL for the book's PDF
    */
   getPdfDownloadUrl(bookId: string): string {

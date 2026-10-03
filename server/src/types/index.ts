@@ -44,7 +44,7 @@ export interface BookDTO {
   paperSize?: string;
   orientation?: string;
   pdfUrl?: string | null;
-  pdfStatus?: 'not_started' | 'generating' | 'completed' | 'failed';
+  pdfStatus?: 'not_started' | 'generating' | 'completed' | 'failed' | 'stale';
   pages?: BookPageDTO[];
   createdAt: string;
   updatedAt: string;

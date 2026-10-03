@@ -9,6 +9,8 @@
     "start": "node dist/index.js",
     "test:engine": "tsx test-engine.ts",
     "test:pdf": "tsx test-pdf.ts",
+    "test:phase3": "tsx test-my-books.ts",
+    "test:all": "tsx test-engine.ts && tsx test-pdf.ts && tsx test-my-books.ts && tsx test-e2e-pdf.ts",
     "prisma:generate": "prisma generate --schema=../prisma/schema.prisma"
   },
   "dependencies": {

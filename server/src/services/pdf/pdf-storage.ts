@@ -1,6 +1,7 @@
 import fs from 'fs/promises';
 import fsSync from 'fs';
 import path from 'path';
+import { AppError } from '../../middleware/errorHandler.js';
 
 export class PdfStorage {
   private baseDir: string;
@@ -16,16 +17,43 @@ export class PdfStorage {
     return this.baseDir;
   }
 
+  /**
+   * Sanitizes book identifier and protects against directory traversal
+   */
+  private sanitizeId(id: string): string {
+    const clean = String(id || '').replace(/[^a-zA-Z0-9_-]/g, '');
+    if (!clean) {
+      throw new AppError('Invalid book identifier.', 400, 'INVALID_IDENTIFIER');
+    }
+    return clean;
+  }
+
+  /**
+   * Verifies that the resolved path is strictly within the allowed root directory
+   */
+  private assertSafePath(targetPath: string): void {
+    const relative = path.relative(this.baseDir, targetPath);
+    if (relative.startsWith('..') || path.isAbsolute(relative)) {
+      throw new AppError('Path traversal attempt detected.', 400, 'INVALID_PATH');
+    }
+  }
+
   getBookPdfDirectory(bookId: string): string {
-    return path.join(this.baseDir, 'books', bookId);
+    const safeId = this.sanitizeId(bookId);
+    const bookDir = path.join(this.baseDir, 'books', safeId);
+    this.assertSafePath(bookDir);
+    return bookDir;
   }
 
   getPdfPath(bookId: string): string {
-    return path.join(this.getBookPdfDirectory(bookId), 'coloring-book.pdf');
+    const filePath = path.join(this.getBookPdfDirectory(bookId), 'coloring-book.pdf');
+    this.assertSafePath(filePath);
+    return filePath;
   }
 
   getPdfUrl(bookId: string): string {
-    return `/storage/pdfs/books/${bookId}/coloring-book.pdf?t=${Date.now()}`;
+    const safeId = this.sanitizeId(bookId);
+    return `/storage/pdfs/books/${safeId}/coloring-book.pdf?t=${Date.now()}`;
   }
 
   async ensureDirectory(bookId: string): Promise<string> {
@@ -35,14 +63,18 @@ export class PdfStorage {
   }
 
   pdfExists(bookId: string): boolean {
-    const filePath = this.getPdfPath(bookId);
-    return fsSync.existsSync(filePath);
+    try {
+      const filePath = this.getPdfPath(bookId);
+      return fsSync.existsSync(filePath);
+    } catch {
+      return false;
+    }
   }
 
   async deletePdf(bookId: string): Promise<boolean> {
-    const filePath = this.getPdfPath(bookId);
     try {
-      await fs.unlink(filePath);
+      const dir = this.getBookPdfDirectory(bookId);
+      await fs.rm(dir, { recursive: true, force: true });
       return true;
     } catch {
       return false;

@@ -11,6 +11,7 @@ interface PDFSettingsProps {
   onCreatePDF: () => void;
   isGeneratingPDF?: boolean;
   errorMessage?: string | null;
+  isStale?: boolean;
 }
 
 export const PDFSettings: React.FC<PDFSettingsProps> = ({
@@ -22,6 +23,7 @@ export const PDFSettings: React.FC<PDFSettingsProps> = ({
   onCreatePDF,
   isGeneratingPDF = false,
   errorMessage,
+  isStale = false,
 }) => {
   return (
     <div className="w-full bg-white rounded-3xl border border-slate-200/90 shadow-soft p-6 sm:p-8">
@@ -29,6 +31,12 @@ export const PDFSettings: React.FC<PDFSettingsProps> = ({
         <div className="mb-6 p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 text-xs font-semibold flex items-center gap-3 animate-in fade-in">
           <AlertCircle className="w-5 h-5 text-rose-600 shrink-0" />
           <span>{errorMessage}</span>
+        </div>
+      )}
+      {isStale && !errorMessage && (
+        <div className="mb-6 p-4 rounded-2xl bg-amber-50 border border-amber-200 text-amber-800 text-xs font-semibold flex items-center gap-3 animate-in fade-in">
+          <FileText className="w-5 h-5 text-amber-600 shrink-0" />
+          <span>Your coloring book artwork has been modified. Recompile the PDF below to include the latest artwork.</span>
         </div>
       )}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
@@ -132,7 +140,7 @@ export const PDFSettings: React.FC<PDFSettingsProps> = ({
               ) : (
                 <>
                   <Printer className="w-4 h-4" />
-                  <span>Create PDF</span>
+                  <span>{isStale ? 'Update PDF' : 'Create PDF'}</span>
                   <ArrowRight className="w-4 h-4" />
                 </>
               )}

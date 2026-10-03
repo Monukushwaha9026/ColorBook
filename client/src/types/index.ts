@@ -43,7 +43,7 @@ export interface Book {
   paperSize?: PaperSize;
   orientation?: Orientation;
   pdfUrl?: string | null;
-  pdfStatus?: 'not_started' | 'generating' | 'completed' | 'failed';
+  pdfStatus?: 'not_started' | 'generating' | 'completed' | 'failed' | 'stale';
   referenceImage?: string | null;
   referenceImageUrl?: string | null;
   createdAt: string;

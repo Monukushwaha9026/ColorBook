@@ -62,6 +62,7 @@ export class BookController {
       const id = String(req.params.id);
       const { pages } = req.body;
       const saved = await BookService.savePages(id, pages);
+      await BookService.updateBookPdfInfo(id, { pdfStatus: 'stale' });
       res.json({ success: true, pages: saved });
     } catch (err) {
       next(err);
@@ -123,6 +124,8 @@ export class BookController {
       const bookId = String(req.params.id || req.params.bookId);
       const pageNumber = Number(req.params.pageNumber || req.params.pageId);
       const page = await BookGenerationService.regenerateSinglePage(bookId, pageNumber);
+      // Invalidate PDF because book artwork has changed
+      await BookService.updateBookPdfInfo(bookId, { pdfStatus: 'stale' });
       res.json({
         success: true,
         page,
@@ -140,6 +143,8 @@ export class BookController {
       const bookId = String(req.params.id || req.params.bookId);
       const pageNumber = Number(req.params.pageNumber || req.params.pageId);
       const result = await BookService.deletePage(bookId, pageNumber);
+      // Invalidate PDF because pages have changed
+      await BookService.updateBookPdfInfo(bookId, { pdfStatus: 'stale' });
       res.json({
         success: true,
         remainingPages: result.remainingPages,
@@ -177,6 +182,7 @@ export class BookController {
         success: true,
         pdfUrl: result.pdfUrl,
         pageCount: result.pageCount,
+        pdfStatus: 'completed',
         message: 'Printable PDF generated successfully.',
       });
     } catch (err) {
@@ -198,6 +204,10 @@ export class BookController {
 
       if (!pdfStorage.pdfExists(bookId)) {
         throw new AppError('No PDF found for this coloring book. Please generate the PDF first.', 404, 'PDF_NOT_FOUND');
+      }
+
+      if (book.pdfStatus === 'stale') {
+        throw new AppError('The PDF is outdated because pages were modified. Please regenerate the PDF.', 409, 'PDF_STALE');
       }
 
       const rawTitle = book.title || book.prompt || 'coloring-book';

@@ -26,11 +26,13 @@ app.use(
 app.use(express.json({ limit: '15mb' }));
 app.use(express.urlencoded({ extended: true, limit: '15mb' }));
 
-// Static file serving for stored coloring pages and printable PDFs
+// Static file serving for stored coloring pages, printable PDFs, and uploaded references
 app.use('/storage/images', express.static(imageStorage.getBaseDir()));
 app.use('/api/storage/images', express.static(imageStorage.getBaseDir()));
 app.use('/storage/pdfs', express.static(pdfStorage.getBaseDir()));
 app.use('/api/storage/pdfs', express.static(pdfStorage.getBaseDir()));
+app.use('/storage/references', express.static(imageStorage.getReferencesDir()));
+app.use('/api/storage/references', express.static(imageStorage.getReferencesDir()));
 
 // API Routes
 app.use('/api', healthRouter);

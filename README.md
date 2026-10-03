@@ -15,7 +15,11 @@ ColorBook AI enables parents, educators, and creative users to create customized
 - **AI Storyline & Page Concepts**: Google Gemini generates cohesive titles, narrative concepts, and line art prompts for each page.
 - **Real Image Generation**: Integrates with local Stable Diffusion WebUI or cloud Hugging Face inference.
 - **Quality & Safety Validation**: Every generated image is verified for format, dimensions ($768 \times 1024$), and line art contrast.
-- **Interactive Review**: Preview full pages, regenerate individual pages with fresh variations, or delete and renumber pages sequentially.
+- **Interactive Review**: Preview full pages, inspect high-res modal views, regenerate individual pages with fresh variations, or delete and renumber pages sequentially.
+- **Printable PDF Export**: Turn generated pages into crisp, print-ready coloring book PDFs with customizable paper size (A4 / US Letter) and orientation (Portrait / Landscape).
+- **My Books Library**: Saved books are automatically listed in a gallery with cover thumbnails, generation/PDF statuses, direct re-downloading, and deletion.
+- **Reopening & Invalidation**: Open any existing book to continue editing or regenerating pages. Edits automatically invalidate outdated PDFs with clear warnings and 1-click recompilation.
+- **Security & Safety**: Path traversal immunity, ID sanitization, safe file storage, and lightweight in-memory rate limiting.
 
 ---
 
@@ -29,7 +33,8 @@ ColorBook AI enables parents, educators, and creative users to create customized
   - `LocalImageProvider`: AUTOMATIC1111 / SD.Next / Fooocus `/sdapi/v1/txt2img` protocol
   - `HuggingFaceImageProvider`: Hugging Face Router Inference API
   - `TestImageProvider`: Fast, deterministic synthetic line art fallback reserved strictly for automated CI/tests
-- **Storage**: Local filesystem storage with Express static serving (`/storage/images/...`)
+- **PDF Generation**: PDFKit with precise margins, containment scaling, and clean printable borders
+- **Storage**: Local filesystem storage with Express static serving (`/storage/images/...`, `/storage/pdfs/...`, `/storage/references/...`)
 
 ---
 
@@ -126,67 +131,68 @@ npm --prefix client run dev
 
 ## 7. How to Run Tests
 
-Run the comprehensive engine test suite:
-
+### Run All Test Suites
 ```bash
-npm --prefix server run test:engine
+npm --prefix server run test:all
 ```
 
-This verifies:
-- Prompt generation across all 4 age groups
-- Content safety sanitization
-- Book plan validation and JSON extraction
-- TestImageProvider functionality
-- Image quality and format validation
-- 3-attempt validation retry loop
-- Offline provider failure handling (no silent synthetic art fallbacks)
-- Hugging Face adapter and missing key diagnostics
-- Provider configuration validation
-- Local image storage (save, retrieve, delete)
-- Book creation and background generation orchestration
-- Single-page regeneration preserving untouched pages
-- Page deletion and sequential renumbering
-- Job cancellation
-
-To verify real image generation with a local or mock Stable Diffusion instance:
+### Individual Test Suites
 ```bash
-npx --prefix server tsx test-real-image.ts
+# Engine test suite (81 tests)
+npm --prefix server run test:engine
+
+# PDF generation and layout suite (43 tests)
+npm --prefix server run test:pdf
+
+# Phase 3 My Books, Invalidation, & Security suite (40 tests)
+npm --prefix server run test:phase3
+
+# End-to-End full flow verification
+npx --prefix server tsx test-e2e-pdf.ts
 ```
 
 ---
 
-## 8. Current MVP Workflow
+## 8. Complete MVP Workflow
 
 ```text
-User enters coloring-book idea
-  ↓
-Selects age group (kids, children, teens, teen_plus)
-  ↓
-Selects page count (1 to 10 pages)
-  ↓
-Optionally uploads reference image (JPEG, PNG, WebP)
-  ↓
-Gemini creates unique page concepts & visual prompts
-  ↓
-Image provider generates coloring pages (local SD or cloud)
-  ↓
-ImageValidator checks dimensions, format & quality
-  ↓
-Pages appear in interactive preview grid
-  ↓
-User can regenerate an individual page
-  ↓
-User can delete a page (remaining pages renumber sequentially)
-  ↓
-User reviews the book
-  ↓
-[Step 2 will generate the downloadable PDF]
+1. User enters coloring-book idea
+   ↓
+2. Selects age group (kids, children, teens, teen_plus)
+   ↓
+3. Selects page count (1 to 10 pages)
+   ↓
+4. Optionally uploads reference image (JPEG, PNG, WebP)
+   ↓
+5. Gemini plans unique page concepts & age-specific visual prompts
+   ↓
+6. Image provider generates coloring pages (local SD or cloud)
+   ↓
+7. ImageValidator checks dimensions, format, contrast & linework
+   ↓
+8. Interactive review grid displays artwork
+   ↓
+9. User can regenerate individual pages or delete unwanted pages
+   ↓
+10. User selects paper size (A4 / US Letter) and orientation (Portrait / Landscape)
+   ↓
+11. PDFKit generates print-ready PDF with containment scaling & borders
+   ↓
+12. User downloads printable PDF coloring book
+   ↓
+13. Book is stored in 'My Books' with cover thumbnail and statuses
+   ↓
+14. User can reopen the book at any time to edit, regenerate, or re-download
+   ↓
+15. If pages are edited, the PDF is marked stale to prevent outdated downloads until recompiled
 ```
 
 ---
 
-## 9. Known Limitations
+## 9. Architecture & Security Guarantees
 
-- **PDF Generation**: Reserved for Step 2. The PDF settings UI is present in review mode, but actual multi-page PDF rendering is scheduled for the next development phase.
-- **User Accounts & Payments**: Authentication, multi-user teams, billing, and payments are intentionally out of scope for the current MVP.
-- **Hugging Face Serverless**: Hugging Face has deprecated FLUX.1 models on free serverless inference (`provider: hf-inference`); dedicated endpoints or local Stable Diffusion are recommended for real generation.
+- **No Stale PDFs**: Any modification to a book's pages (regeneration, deletion, reordering) marks `pdfStatus: 'stale'`. Downloads of stale PDFs return HTTP 409 `PDF_STALE`, and the UI prompts the user to recompile.
+- **Directory Traversal Immunity**: All file endpoints and storage operations strictly validate IDs (`/^[a-zA-Z0-9_-]+$/`) and assert resolved canonical paths remain within designated storage root directories.
+- **In-Memory Rate Limiting**: Expensive endpoints (`POST /api/books`, `POST /api/books/:id/generate`, `POST /api/books/:id/pages/:page/regenerate`, `POST /api/books/:id/pdf`) are protected against abuse with automated HTTP 429 throttling and `Retry-After` headers.
+- **Disk Cleanup on Deletion**: Deleting a book atomically cleans up references, page image directories, and compiled PDF directories.
+

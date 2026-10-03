@@ -12,7 +12,7 @@ import { PDFSettings } from '../components/PDFSettings';
 import { PDFSuccessCard } from '../components/PDFSuccessCard';
 import { api, ApiClientError } from '../lib/api';
 import { generateMockBookPages } from '../lib/mockPlanner';
-import { AlertCircle, KeyRound, Sparkles, X, ExternalLink, ArrowRight } from 'lucide-react';
+import { AlertCircle, KeyRound, Sparkles, X, ExternalLink, ArrowRight, ArrowLeft } from 'lucide-react';
 import type {
   AgeGroupId,
   ColoringPageItem,
@@ -25,18 +25,24 @@ import type {
 
 interface CreatePageProps {
   initialPrompt?: string;
+  initialBook?: Book | null;
   onSaveBook?: (book: Book) => void;
+  onBackToMyBooks?: () => void;
+  onResetToNew?: () => void;
 }
 
 export const CreatePage: React.FC<CreatePageProps> = ({
   initialPrompt = '',
+  initialBook = null,
   onSaveBook,
+  onBackToMyBooks,
+  onResetToNew,
 }) => {
   // Form State
-  const [prompt, setPrompt] = useState<string>(initialPrompt);
-  const [ageGroup, setAgeGroup] = useState<AgeGroupId>('children');
-  const [pageCount, setPageCount] = useState<number>(8);
-  const [referenceImage, setReferenceImage] = useState<string | null>(null);
+  const [prompt, setPrompt] = useState<string>(initialBook?.prompt || initialPrompt);
+  const [ageGroup, setAgeGroup] = useState<AgeGroupId>(initialBook?.ageGroup || 'children');
+  const [pageCount, setPageCount] = useState<number>(initialBook?.pageCount || 8);
+  const [referenceImage, setReferenceImage] = useState<string | null>(initialBook?.referenceImageUrl || null);
 
   // Validation & Error State
   const [promptError, setPromptError] = useState<string | null>(null);
@@ -46,31 +52,81 @@ export const CreatePage: React.FC<CreatePageProps> = ({
   const [apiKeyNeededModal, setApiKeyNeededModal] = useState<boolean>(false);
 
   // Workflow State
-  const [currentStep, setCurrentStep] = useState<CreationStep>(1);
-  const [generationPhase, setGenerationPhase] = useState<GenerationPhase>('idle');
+  const [currentStep, setCurrentStep] = useState<CreationStep>(initialBook ? (initialBook.status === 'generating' ? 2 : 3) : 1);
+  const [generationPhase, setGenerationPhase] = useState<GenerationPhase>(initialBook ? (initialBook.status === 'generating' ? 'generating' : 'completed') : 'idle');
   const [activePageNumber, setActivePageNumber] = useState<number>(1);
   const [completedPagesCount, setCompletedPagesCount] = useState<number>(0);
-  const [isPlanningDone, setIsPlanningDone] = useState<boolean>(false);
+  const [isPlanningDone, setIsPlanningDone] = useState<boolean>(Boolean(initialBook));
   const [planningStatusMessage, setPlanningStatusMessage] = useState<string>('');
-  const [createdBookId, setCreatedBookId] = useState<string>('');
+  const [createdBookId, setCreatedBookId] = useState<string>(initialBook?.id || '');
 
   // Polling ref to prevent concurrent polling loops
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Book Plan Metadata
-  const [bookTitle, setBookTitle] = useState<string>('');
-  const [bookTheme, setBookTheme] = useState<string>('');
-  const [bookStyleDirection, setBookStyleDirection] = useState<string>('');
+  const [bookTitle, setBookTitle] = useState<string>(initialBook?.title || initialBook?.prompt || '');
+  const [bookTheme, setBookTheme] = useState<string>(initialBook?.theme || initialBook?.prompt || '');
+  const [bookStyleDirection, setBookStyleDirection] = useState<string>(initialBook?.styleDirection || '');
 
   // Generated Pages State
-  const [generatedPages, setGeneratedPages] = useState<ColoringPageItem[]>([]);
+  const [generatedPages, setGeneratedPages] = useState<ColoringPageItem[]>(initialBook?.pages || []);
 
   // PDF Settings State
-  const [paperSize, setPaperSize] = useState<PaperSize>('A4');
-  const [orientation, setOrientation] = useState<Orientation>('PORTRAIT');
+  const [paperSize, setPaperSize] = useState<PaperSize>((initialBook?.paperSize as PaperSize) || 'A4');
+  const [orientation, setOrientation] = useState<Orientation>((initialBook?.orientation as Orientation) || 'PORTRAIT');
   const [isGeneratingPDF, setIsGeneratingPDF] = useState<boolean>(false);
   const [pdfSuccess, setPdfSuccess] = useState<boolean>(false);
   const [pdfError, setPdfError] = useState<string | null>(null);
+  const [pdfStatus, setPdfStatus] = useState<string>(initialBook?.pdfStatus || 'not_started');
+
+  // Load fresh book details from database when reopening an existing book
+  useEffect(() => {
+    if (!initialBook) return;
+
+    let isMounted = true;
+    const fetchLatest = async () => {
+      try {
+        const res = await api.getBook(initialBook.id);
+        if (!isMounted || !res.book) return;
+
+        const b = res.book;
+        setCreatedBookId(b.id);
+        setPrompt(b.prompt || '');
+        setBookTitle(b.title || b.prompt || '');
+        setBookTheme(b.theme || b.prompt || '');
+        setBookStyleDirection(b.styleDirection || '');
+        setAgeGroup(b.ageGroup);
+        setPageCount(b.pageCount);
+        if (b.paperSize) setPaperSize(b.paperSize as PaperSize);
+        if (b.orientation) setOrientation(b.orientation as Orientation);
+        setReferenceImage(b.referenceImageUrl || null);
+        setPdfStatus(b.pdfStatus || 'not_started');
+
+        const pages = b.pages || [];
+        setGeneratedPages(pages);
+        const completed = pages.filter((p) => p.status === 'completed').length;
+        setCompletedPagesCount(completed);
+
+        if (b.status === 'generating') {
+          setCurrentStep(2);
+          setGenerationPhase('generating');
+          startPollingProgress(b.id, b.pageCount);
+        } else {
+          setCurrentStep(3);
+          setGenerationPhase('completed');
+          setIsPlanningDone(true);
+        }
+      } catch (err) {
+        console.warn('Could not reload fresh book from server, using provided data:', err);
+      }
+    };
+
+    fetchLatest();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [initialBook]);
 
   // Clean up polling timer on unmount
   useEffect(() => {
@@ -268,22 +324,6 @@ export const CreatePage: React.FC<CreatePageProps> = ({
     }, 500);
   };
 
-  // Instant skip for quick preview
-  const handleSkipGeneration = () => {
-    stopPolling();
-    const plannedPages = generateMockBookPages(prompt.trim() || 'Coloring Book', pageCount, createdBookId || 'book_fast');
-    setBookTitle(`${prompt.trim() || 'Custom'} Coloring Book`);
-    setBookTheme(prompt.trim());
-    setBookStyleDirection('Clean printable line art');
-    setGeneratedPages(plannedPages);
-    setGenerationPhase('completed');
-    setCurrentStep(3);
-    setIsSubmitting(false);
-    if (createdBookId) {
-      api.saveBookPages(createdBookId, plannedPages).catch(() => {});
-    }
-  };
-
   // Regenerate an individual page (only that page changes)
   const handleRegeneratePage = async (pageNumber: number) => {
     setGeneratedPages((prev) =>
@@ -291,6 +331,8 @@ export const CreatePage: React.FC<CreatePageProps> = ({
         p.pageNumber === pageNumber ? { ...p, isRegenerating: true, status: 'generating' } : p
       )
     );
+    setPdfSuccess(false);
+    setPdfStatus('stale');
 
     try {
       const res = await api.regeneratePage(createdBookId || 'current_book', pageNumber);
@@ -310,31 +352,25 @@ export const CreatePage: React.FC<CreatePageProps> = ({
         )
       );
 
-      setNotificationMessage(`Page ${pageNumber} artwork refreshed with a new variation!`);
-      setTimeout(() => setNotificationMessage(null), 3000);
-    } catch {
-      // Fallback
-      setTimeout(() => {
-        setGeneratedPages((prev) =>
-          prev.map((p) =>
-            p.pageNumber === pageNumber
-              ? {
-                  ...p,
-                  concept: `${p.concept} (Alternative)`,
-                  imageUrl: '/illustrations/coloring-spaceship.svg',
-                  status: 'completed',
-                  isRegenerating: false,
-                }
-              : p
-          )
-        );
-      }, 600);
+      setNotificationMessage(`Page ${pageNumber} artwork refreshed! Recompile the PDF below to include the new artwork.`);
+      setTimeout(() => setNotificationMessage(null), 4000);
+    } catch (err: unknown) {
+      setGeneratedPages((prev) =>
+        prev.map((p) =>
+          p.pageNumber === pageNumber ? { ...p, isRegenerating: false } : p
+        )
+      );
+      const msg = err instanceof Error ? err.message : 'Could not regenerate this page. Please try again.';
+      setNotificationMessage(msg);
+      setTimeout(() => setNotificationMessage(null), 4000);
     }
   };
 
   // Delete a page and visually renumber remaining pages
   const handleDeletePage = async (pageNumber: number) => {
     if (generatedPages.length <= 1) return;
+    setPdfSuccess(false);
+    setPdfStatus('stale');
 
     if (createdBookId) {
       try {
@@ -345,8 +381,8 @@ export const CreatePage: React.FC<CreatePageProps> = ({
           setTimeout(() => setNotificationMessage(null), 3200);
           return;
         }
-      } catch {
-        // Fallback to local renumbering
+      } catch (err) {
+        console.warn('Backend page delete call failed, falling back to local renumbering:', err);
       }
     }
 
@@ -365,6 +401,8 @@ export const CreatePage: React.FC<CreatePageProps> = ({
   // Add an extra page up to 10
   const handleAddPage = () => {
     if (generatedPages.length >= 10) return;
+    setPdfSuccess(false);
+    setPdfStatus('stale');
     const newPageNum = generatedPages.length + 1;
     const additionalPages = generateMockBookPages(prompt.trim() || 'Coloring Book', 10, createdBookId || 'current_book');
     const template = additionalPages[(newPageNum - 1) % additionalPages.length];
@@ -411,6 +449,7 @@ export const CreatePage: React.FC<CreatePageProps> = ({
       }
 
       setPdfSuccess(true);
+      setPdfStatus('completed');
       setCurrentStep(4);
 
       if (onSaveBook) {
@@ -468,22 +507,43 @@ export const CreatePage: React.FC<CreatePageProps> = ({
   // Reset to create another book
   const handleReset = () => {
     stopPolling();
+    if (onResetToNew) {
+      onResetToNew();
+      return;
+    }
     setCurrentStep(1);
     setGenerationPhase('idle');
     setPdfSuccess(false);
+    setPdfStatus('not_started');
     setPdfError(null);
+    setCreatedBookId('');
     setGeneratedPages([]);
     setBookTitle('');
     setBookTheme('');
     setBookStyleDirection('');
     setCompletedPagesCount(0);
     setActivePageNumber(1);
+    setPrompt('');
     setPromptError(null);
     setBackendError(null);
   };
 
   return (
     <div className="w-full max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pb-16">
+      {/* Back to My Books Button when reviewing an existing book */}
+      {onBackToMyBooks && (
+        <div className="pt-4 pb-2">
+          <button
+            type="button"
+            onClick={onBackToMyBooks}
+            className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-white border border-slate-200 text-xs font-bold text-slate-700 hover:text-purple-700 hover:border-purple-300 hover:bg-purple-50/50 shadow-2xs transition-all cursor-pointer"
+          >
+            <ArrowLeft className="w-3.5 h-3.5" />
+            <span>Back to My Books</span>
+          </button>
+        </div>
+      )}
+
       {/* 1. Hero Header */}
       <Hero />
 
@@ -611,7 +671,6 @@ export const CreatePage: React.FC<CreatePageProps> = ({
           isPlanningDone={isPlanningDone}
           statusMessage={planningStatusMessage}
           onCancel={handleCancelGeneration}
-          onSkip={handleSkipGeneration}
         />
       )}
 
@@ -638,6 +697,7 @@ export const CreatePage: React.FC<CreatePageProps> = ({
             onCreatePDF={handleCreatePDF}
             isGeneratingPDF={isGeneratingPDF}
             errorMessage={pdfError}
+            isStale={pdfStatus === 'stale'}
           />
         </div>
       )}

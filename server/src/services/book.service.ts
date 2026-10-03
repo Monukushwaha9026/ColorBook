@@ -2,6 +2,8 @@ import { prisma } from '../lib/prisma.js';
 import type { BookDTO, CreateBookInput, BookPageDTO, BookStatus } from '../types/index.js';
 import { AppError } from '../middleware/errorHandler.js';
 import { BookPlannerService } from './ai/book-planner.service.js';
+import { imageStorage } from './storage/local-image-storage.js';
+import { pdfStorage } from './pdf/pdf-storage.js';
 
 // In-memory fallback repository when PostgreSQL database is not actively running
 const memoryBooks: Map<string, BookDTO> = new Map();
@@ -34,8 +36,11 @@ export class BookService {
     let referenceImageUrl: string | null = null;
     if (input.referenceImage) {
       if (input.referenceImage.startsWith('data:')) {
-        // Mock stored reference path (avoiding raw megabytes in PostgreSQL table)
-        referenceImageUrl = `/uploads/references/${id}.png`;
+        try {
+          referenceImageUrl = await imageStorage.saveReferenceImage(id, input.referenceImage);
+        } catch {
+          referenceImageUrl = null;
+        }
       } else {
         referenceImageUrl = input.referenceImage;
       }
@@ -145,7 +150,7 @@ export class BookService {
     id: string,
     data: {
       pdfUrl?: string | null;
-      pdfStatus?: 'not_started' | 'generating' | 'completed' | 'failed';
+      pdfStatus?: 'not_started' | 'generating' | 'completed' | 'failed' | 'stale';
       paperSize?: string;
       orientation?: string;
     }
@@ -343,14 +348,42 @@ export class BookService {
           include: { pages: { orderBy: { pageNumber: 'asc' } } },
           orderBy: { createdAt: 'desc' },
         });
-        if (dbBooks && dbBooks.length > 0) return dbBooks as unknown as BookDTO[];
+        if (dbBooks) {
+          return dbBooks.map((b) => {
+            const activePages = (b.pages || []).filter((p) => p.status !== 'deleted');
+            const completedPages = activePages.filter((p) => p.status === 'completed').length;
+            const coverImage = activePages.find((p) => p.imageUrl)?.imageUrl || null;
+            return {
+              ...b,
+              pages: activePages,
+              completedPages,
+              coverImage,
+            };
+          }) as unknown as BookDTO[];
+        }
         return Array.from(memoryBooks.values())
-          .map((b) => ({ ...b, pages: (memoryPages.get(b.id) || []).filter((p) => p.status !== 'deleted') }))
+          .map((b) => {
+            const pages = (memoryPages.get(b.id) || []).filter((p) => p.status !== 'deleted');
+            return {
+              ...b,
+              pages,
+              completedPages: pages.filter((p) => p.status === 'completed').length,
+              coverImage: pages.find((p) => p.imageUrl)?.imageUrl || null,
+            };
+          })
           .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
       },
       () => {
         return Array.from(memoryBooks.values())
-          .map((b) => ({ ...b, pages: (memoryPages.get(b.id) || []).filter((p) => p.status !== 'deleted') }))
+          .map((b) => {
+            const pages = (memoryPages.get(b.id) || []).filter((p) => p.status !== 'deleted');
+            return {
+              ...b,
+              pages,
+              completedPages: pages.filter((p) => p.status === 'completed').length,
+              coverImage: pages.find((p) => p.imageUrl)?.imageUrl || null,
+            };
+          })
           .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
       }
     );
@@ -513,11 +546,19 @@ export class BookService {
   static async deleteBook(id: string): Promise<boolean> {
     await tryDb(
       async () => {
+        await prisma.bookPage.deleteMany({ where: { bookId: id } });
         await prisma.book.delete({ where: { id } });
       },
       () => {}
     );
     memoryPages.delete(id);
-    return memoryBooks.delete(id);
+    const deleted = memoryBooks.delete(id);
+
+    // Thorough cleanup of all local disk storage for the deleted book
+    await imageStorage.deleteReferenceImage(id);
+    await imageStorage.deleteBookImages(id);
+    await pdfStorage.deletePdf(id);
+
+    return deleted;
   }
 }

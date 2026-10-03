@@ -1,5 +1,5 @@
 import React from 'react';
-import { Check, Loader2, Sparkles, XCircle, FastForward } from 'lucide-react';
+import { Check, Loader2, Sparkles, XCircle } from 'lucide-react';
 
 interface GenerationProgressProps {
   currentPage: number;
@@ -8,7 +8,6 @@ interface GenerationProgressProps {
   isPlanningDone: boolean;
   statusMessage?: string;
   onCancel?: () => void;
-  onSkip?: () => void;
 }
 
 export const GenerationProgress: React.FC<GenerationProgressProps> = ({
@@ -18,7 +17,6 @@ export const GenerationProgress: React.FC<GenerationProgressProps> = ({
   isPlanningDone,
   statusMessage,
   onCancel,
-  onSkip,
 }) => {
   // If planning is done, progress represents real generation: 20% base + 80% * (completed / total)
   const percent = isPlanningDone
@@ -130,7 +128,7 @@ export const GenerationProgress: React.FC<GenerationProgressProps> = ({
         </div>
       </div>
 
-      {/* Action buttons (Cancel & Skip) */}
+      {/* Action buttons (Cancel) */}
       <div className="mt-6 pt-4 border-t border-slate-100 flex items-center justify-center gap-4">
         {onCancel && (
           <button
@@ -140,18 +138,6 @@ export const GenerationProgress: React.FC<GenerationProgressProps> = ({
           >
             <XCircle className="w-3.5 h-3.5" />
             <span>Cancel generation</span>
-          </button>
-        )}
-
-        {onSkip && (
-          <button
-            type="button"
-            onClick={onSkip}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-500 hover:text-purple-700 hover:bg-purple-50 transition-colors cursor-pointer"
-            title="Fast forward to preview"
-          >
-            <FastForward className="w-3.5 h-3.5" />
-            <span>Fast-forward preview</span>
           </button>
         )}
       </div>
