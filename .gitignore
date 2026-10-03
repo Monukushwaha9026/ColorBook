@@ -19,9 +19,9 @@ dist-ssr
 !.env.example
 
 # Storage
-storage/
-server/storage/
-client/storage/
+/storage/
+/server/storage/
+/client/storage/
 
 # Editor directories and files
 .vscode/*
