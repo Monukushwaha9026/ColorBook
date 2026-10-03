@@ -3,7 +3,6 @@ import cors from 'cors';
 import path from 'path';
 import dotenv from 'dotenv';
 import { bookRouter } from './routes/book.routes.js';
-import { pageRouter, standalonePageRouter } from './routes/page.routes.js';
 import { healthRouter } from './routes/health.routes.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import { imageStorage } from './services/storage/local-image-storage.js';
@@ -33,8 +32,6 @@ app.use('/api/storage/images', express.static(imageStorage.getBaseDir()));
 // API Routes
 app.use('/api', healthRouter);
 app.use('/api/books', bookRouter);
-app.use('/api/books/:bookId/pages', pageRouter);
-app.use('/api/pages', standalonePageRouter);
 
 // Error handling
 app.use(errorHandler);

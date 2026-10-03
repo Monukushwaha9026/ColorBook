@@ -1,7 +1,7 @@
 import type { ImageProvider, ImageGenerationInput, GeneratedImage } from './image-provider.interface.js';
 import { LocalImageProvider } from './local-image-provider.js';
 import { HuggingFaceImageProvider } from './huggingface-image-provider.js';
-import { TestImageProvider } from './free-image-provider.js';
+import { TestImageProvider } from './test-image-provider.js';
 import { ImageValidator, type ImageValidationResult } from './image-validator.js';
 import { AppError } from '../../middleware/errorHandler.js';
 

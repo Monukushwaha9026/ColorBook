@@ -11,12 +11,14 @@ import { ImagePromptBuilder } from './src/services/image/image-prompt-builder.js
 import { ImageValidator } from './src/services/image/image-validator.js';
 import { LocalImageProvider } from './src/services/image/local-image-provider.js';
 import { HuggingFaceImageProvider } from './src/services/image/huggingface-image-provider.js';
-import { TestImageProvider, FreeImageProvider } from './src/services/image/free-image-provider.js';
+import { TestImageProvider } from './src/services/image/test-image-provider.js';
 import { ImageProviderService } from './src/services/image/image-provider.service.js';
 import { imageStorage } from './src/services/storage/local-image-storage.js';
 import { BookService } from './src/services/book.service.js';
 import { BookGenerationService } from './src/services/ai/book-generation.service.js';
 import { BookPlannerService } from './src/services/ai/book-planner.service.js';
+import { BookPlanValidator } from './src/services/ai/book-plan-validator.js';
+import { GeminiService } from './src/services/ai/gemini.service.js';
 import { AppError } from './src/middleware/errorHandler.js';
 import type { ImageProvider, ImageGenerationInput, GeneratedImage } from './src/services/image/image-provider.interface.js';
 import type { AIProvider, BookPlan, BookPlanInput } from './src/services/ai/ai-provider.interface.js';
@@ -102,6 +104,66 @@ async function runTestSuite() {
   assert(!zombieLower.includes('blood'), 'Sanitization removes "blood"');
   assert(!zombieLower.includes('attacking'), 'Sanitization removes "attacking"');
   assert(zombieLower.includes('friendly') || zombieLower.includes('playful'), 'Unsafe zombie prompt converted to friendly playful coloring scene');
+
+  // ---------------------------------------------------------------------------
+  // TEST 2B: Book Plan Validator & Gemini Configuration
+  // ---------------------------------------------------------------------------
+  console.log('\n[2B] Testing Book Plan Validator & Gemini Configuration...');
+  const rawPrompt = '  Space Adventure with Alien Pets!\x00\x08  ';
+  const cleanPrompt = BookPlanValidator.sanitizePrompt(rawPrompt);
+  assert(cleanPrompt === 'Space Adventure with Alien Pets!', 'Sanitizes prompt whitespace and control characters');
+
+  const fencedJson = '```json\n{"title": "Test Book", "theme": "Test", "pages": []}\n```';
+  const extracted: any = BookPlanValidator.extractJsonFromText(fencedJson);
+  assert(extracted.title === 'Test Book', 'Extracts valid JSON from markdown code fences');
+
+  const undersizedPlan = {
+    title: 'Dino World',
+    theme: 'dinosaurs',
+    pages: [{ pageNumber: 1, title: 'T-Rex', concept: 'Friendly T-Rex smiling', visualPrompt: 'line art', difficulty: 'easy' }],
+  };
+  const paddedPlan = BookPlanValidator.validateAndConformPlan(undersizedPlan, {
+    prompt: 'Dinosaurs',
+    ageGroup: 'kids',
+    pageCount: 4,
+  });
+  assert(paddedPlan.pages.length === 4, 'Pads undersized plan to exact pageCount (4 pages)');
+  assert(paddedPlan.pages[3].pageNumber === 4, 'Page numbering is strictly sequential 1 to 4');
+
+  const oversizedPlan = {
+    title: 'Space Odyssey',
+    theme: 'space',
+    pages: [
+      { pageNumber: 1, title: 'P1', concept: 'C1', visualPrompt: 'VP1', difficulty: 'medium' },
+      { pageNumber: 2, title: 'P2', concept: 'C2', visualPrompt: 'VP2', difficulty: 'medium' },
+      { pageNumber: 3, title: 'P3', concept: 'C3', visualPrompt: 'VP3', difficulty: 'medium' },
+    ],
+  };
+  const slicedPlan = BookPlanValidator.validateAndConformPlan(oversizedPlan, {
+    prompt: 'Space',
+    ageGroup: 'children',
+    pageCount: 2,
+  });
+  assert(slicedPlan.pages.length === 2, 'Truncates oversized plan to exact pageCount (2 pages)');
+
+  // Missing Gemini key check
+  const savedKey = process.env.GEMINI_API_KEY;
+  process.env.GEMINI_API_KEY = '';
+  const geminiService = new GeminiService();
+  let caughtGeminiError = false;
+  try {
+    await geminiService.generateBookPlan({
+      prompt: 'Ocean animals',
+      ageGroup: 'children',
+      pageCount: 3,
+    });
+  } catch (err: any) {
+    caughtGeminiError = true;
+    assert(err instanceof AppError, 'Missing Gemini key throws AppError');
+    assert(err.code === 'AI_CONFIGURATION_ERROR', 'Gemini error code is AI_CONFIGURATION_ERROR');
+  }
+  assert(caughtGeminiError, 'Gemini throws when GEMINI_API_KEY is empty');
+  process.env.GEMINI_API_KEY = savedKey;
 
   // ---------------------------------------------------------------------------
   // TEST 3: TestImageProvider (TEST / DEVELOPMENT FALLBACK)

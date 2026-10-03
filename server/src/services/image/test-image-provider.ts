@@ -1,7 +1,5 @@
 import zlib from 'zlib';
 import type { ImageProvider, ImageGenerationInput, GeneratedImage } from './image-provider.interface.js';
-import { ImagePromptBuilder } from './image-prompt-builder.js';
-import { ImageValidator } from './image-validator.js';
 
 /**
  * TEST / DEVELOPMENT FALLBACK
@@ -31,72 +29,15 @@ export class TestImageProvider implements ImageProvider {
    * Generates a valid, high-resolution black & white coloring page PNG for zero-dependency development
    */
   private generateFallbackColoringArt(input: ImageGenerationInput, seed: number): Buffer {
-    // Generate an SVG coloring illustration and pack it into a PNG/SVG stream
-    // Because SVG can be rendered or we can create an uncompressed PNG directly
     const width = 768;
     const height = 1024;
-    const strokeWidth = input.ageGroup === 'kids' ? 12 : input.ageGroup === 'children' ? 8 : 5;
-
-    // SVG line art content
-    const svg = `
-<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
-  <rect width="${width}" height="${height}" fill="#FFFFFF"/>
-  <rect x="30" y="30" width="${width - 60}" height="${height - 60}" rx="24" fill="none" stroke="#000000" stroke-width="4" stroke-dasharray="16 12"/>
-  
-  <!-- Main Illustration Scene for ${input.concept} -->
-  <g fill="#FFFFFF" stroke="#000000" stroke-width="${strokeWidth}" stroke-linecap="round" stroke-linejoin="round">
-    <!-- Cloud / Sky / Backdrop -->
-    <path d="M 120 180 Q 180 120 260 160 Q 340 110 420 160 Q 500 130 560 190 Q 640 200 640 260 L 120 260 Z" />
-    
-    <!-- Central Hero Subject -->
-    <circle cx="384" cy="460" r="160" />
-    <ellipse cx="384" cy="480" rx="110" ry="80" />
-    
-    <!-- Eyes / Expression -->
-    <circle cx="330" cy="420" r="20" fill="#000000"/>
-    <circle cx="438" cy="420" r="20" fill="#000000"/>
-    <circle cx="336" cy="414" r="6" fill="#FFFFFF"/>
-    <circle cx="444" cy="414" r="6" fill="#FFFFFF"/>
-    
-    <!-- Smile / Action -->
-    <path d="M 334 490 Q 384 540 434 490" fill="none" stroke-width="${strokeWidth + 2}" />
-    
-    <!-- Foreground Environment Props -->
-    <path d="M 100 820 Q 240 760 384 820 Q 528 760 668 820 L 668 940 L 100 940 Z" />
-    
-    <!-- Decorative Stars / Flowers / Props -->
-    <polygon points="200,320 215,355 250,355 220,375 230,410 200,390 170,410 180,375 150,355 185,355" />
-    <polygon points="570,300 580,325 605,325 585,340 590,365 570,350 550,365 555,340 535,325 560,325" />
-    <polygon points="170,680 180,705 205,705 185,720 190,745 170,730 150,745 155,720 135,705 160,705" />
-    <polygon points="580,680 590,705 615,705 595,720 600,745 580,730 560,745 565,720 545,705 570,705" />
-  </g>
-
-  <!-- Clean footer margin -->
-  <text x="384" y="990" font-family="-apple-system, sans-serif" font-size="16" font-weight="bold" fill="#000000" text-anchor="middle">
-    ${input.bookTitle || 'ColorBook AI'} • Page ${input.pageNumber}
-  </text>
-</svg>
-`;
-
-    // Convert SVG to PNG buffer using simple raw PNG encoding
-    return this.svgToPng(svg, width, height, seed);
-  }
-
-  /**
-   * Generates a 100% compliant, decodable PNG binary buffer with black line art on white background
-   */
-  private svgToPng(svg: string, width: number, height: number, seed: number): Buffer {
-    // Generate valid uncompressed 24-bit PNG with white background and black line art
     return this.createColoringBookPng(width, height, seed);
   }
 
-  private createColoringBookPng(width: number, height: number, seed: number): Buffer {
-    // We create a standard valid PNG binary with IHDR, IDAT (zlib compressed scanlines), and IEND
-    // Create raw image scanlines: 1 filter byte (0) + width * 3 bytes (RGB)
+  private createColoringBookPng(width: number, height: number, _seed: number): Buffer {
     const rowSize = 1 + width * 3;
     const rawData = Buffer.alloc(rowSize * height, 255); // Fill with white (255, 255, 255)
 
-    // Draw clean coloring borders and shapes into raw RGB buffer
     const setPixel = (x: number, y: number, r: number, g: number, b: number) => {
       if (x < 0 || x >= width || y < 0 || y >= height) return;
       const idx = y * rowSize + 1 + x * 3;
@@ -251,7 +192,3 @@ export class TestImageProvider implements ImageProvider {
     return Buffer.concat([sig, ihdrChunk, idatChunk, iendChunk]);
   }
 }
-
-// Backward compatibility alias for existing imports
-export { TestImageProvider as FreeImageProvider };
-
