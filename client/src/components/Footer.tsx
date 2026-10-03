@@ -11,7 +11,14 @@ export const Footer: React.FC = () => {
           </div>
           <span className="font-extrabold text-slate-900">ColorBook <span className="text-purple-600">AI</span></span>
           <span className="text-slate-300">•</span>
-          <span>Turn your ideas into printable coloring books</span>
+          <a
+            href="https://www.instagram.com/monukushwaha9026"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-purple-600 hover:text-purple-700 hover:underline transition-colors flex items-center gap-1 font-medium"
+          >
+            <span>Instagram: @monukushwaha9026</span>
+          </a>
         </div>
 
         <div className="flex items-center gap-1">
