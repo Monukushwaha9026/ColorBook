@@ -4,42 +4,79 @@ services:
     runtime: node
     plan: free
     region: oregon
+
     buildCommand: npm install && npx prisma generate --schema=./prisma/schema.prisma && npm run build
+
+    preDeployCommand: npx prisma migrate deploy
+
     startCommand: npm start
+
     healthCheckPath: /api/health
+
     envVars:
+      # Application
       - key: NODE_ENV
         value: production
-      - key: PORT
-        value: 10000
+
       - key: CLIENT_URL
         value: https://colorbook-ai.onrender.com
+
+      # Gemini - AI book planning / text generation
       - key: GEMINI_API_KEY
         sync: false
+
       - key: GEMINI_TEXT_MODEL
         value: gemini-2.5-flash-lite
+
+      # Hugging Face - AI image generation
       - key: IMAGE_PROVIDER
         value: huggingface
+
       - key: HUGGINGFACE_API_KEY
         sync: false
+
       - key: HUGGINGFACE_MODEL
         value: black-forest-labs/FLUX.1-schnell
+
+      - key: HUGGINGFACE_INFERENCE_PROVIDER
+        value: nscale
+
+      # Image storage
       - key: IMAGE_STORAGE
         value: local
+
       - key: LOCAL_IMAGE_STORAGE_PATH
         value: ./storage/images
-      - key: DISABLE_RATE_LIMIT
-        value: "false"
+
+      # Image generation configuration
       - key: IMAGE_GENERATION_CONCURRENCY
         value: "1"
+
       - key: MAX_IMAGE_GENERATION_ATTEMPTS
         value: "3"
+
+      # Rate limiting
+      - key: DISABLE_RATE_LIMIT
+        value: "false"
+
+      # Daily automatic cleanup
       - key: CLEANUP_ENABLED
         value: "true"
+
       - key: CLEANUP_TIMEZONE
         value: Asia/Kolkata
+
       - key: CLEANUP_CRON_SCHEDULE
         value: "0 1 * * *"
-      # Optional: Connect your Render PostgreSQL database URL or Supabase/Neon connection string here
+
+      # PostgreSQL
       - key: DATABASE_URL
-        sync: false
+        fromDatabase:
+          name: colorbook-db
+          property: connectionString
+
+
+databases:
+  - name: colorbook-db
+    plan: free
+    region: oregon
