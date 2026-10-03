@@ -7,10 +7,15 @@ import { AppError } from '../../middleware/errorHandler.js';
 export class GeminiService implements AIProvider {
   private client: GoogleGenAI | null = null;
   private currentApiKey: string | null = null;
-  private modelName: string;
-
-  constructor() {
-    this.modelName = process.env.GEMINI_TEXT_MODEL || 'gemini-3.5-flash-lite';
+  private getCandidateModels(): string[] {
+    const configured = process.env.GEMINI_TEXT_MODEL?.trim();
+    const defaults = [
+      'gemini-3.8-flash',
+      'gemini-2.5-flash',
+      'gemini-2.0-flash',
+      'gemini-1.5-flash',
+    ];
+    return Array.from(new Set([configured, ...defaults])).filter(Boolean) as string[];
   }
 
   private getClient(): GoogleGenAI {
@@ -64,10 +69,12 @@ Ensure each page has a distinct title, concept, visualPrompt, and age-appropriat
     });
 
     let lastError: unknown = null;
-    for (let attempt = 1; attempt <= 2; attempt++) {
+    const candidateModels = this.getCandidateModels();
+
+    for (const model of candidateModels) {
       try {
         const response = await ai.models.generateContent({
-          model: this.modelName,
+          model,
           contents,
           config: {
             systemInstruction: COLORING_BOOK_SYSTEM_PROMPT,
@@ -96,14 +103,16 @@ Ensure each page has a distinct title, concept, visualPrompt, and age-appropriat
           throw new AppError('Gemini API key is invalid or expired.', 401, 'AI_CONFIGURATION_ERROR');
         }
 
-        if (attempt < 2) {
-          console.warn(`[GeminiService] Book planning attempt 1 failed (${message}). Retrying once...`);
+        if (message.includes('404') || message.includes('no longer available') || message.includes('NOT_FOUND')) {
+          console.warn(`[GeminiService] Model '${model}' not available (${message.slice(0, 80)}). Trying next candidate model...`);
           continue;
         }
+
+        console.warn(`[GeminiService] Error with model '${model}': ${message.slice(0, 80)}`);
       }
     }
 
-    console.error('[GeminiService Error]:', lastError);
+    console.error('[GeminiService Error]: All candidate models failed. Last error:', lastError);
     const msg = lastError instanceof Error ? lastError.message : String(lastError);
     throw new AppError(`Failed to generate book plan: ${msg}`, 502, 'AI_GENERATION_FAILED');
   }

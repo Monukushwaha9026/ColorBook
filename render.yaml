@@ -24,7 +24,7 @@ services:
         sync: false
 
       - key: GEMINI_TEXT_MODEL
-        value: gemini-2.5-flash
+        value: gemini-3.8-flash
 
       # Hugging Face - AI image generation
       - key: IMAGE_PROVIDER
