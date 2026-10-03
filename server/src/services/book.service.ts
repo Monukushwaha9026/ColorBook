@@ -50,6 +50,8 @@ export class BookService {
       status: 'planning', // Status set to 'planning' as specified in Step 2 requirements
       paperSize: input.paperSize || 'A4',
       orientation: input.orientation || 'PORTRAIT',
+      pdfUrl: null,
+      pdfStatus: 'not_started',
       pages: [],
       createdAt: now,
       updatedAt: now,
@@ -69,6 +71,8 @@ export class BookService {
             status: 'planning',
             paperSize: newBook.paperSize || 'A4',
             orientation: newBook.orientation || 'PORTRAIT',
+            pdfUrl: null,
+            pdfStatus: 'not_started',
           },
           include: { pages: true },
         });
@@ -128,6 +132,43 @@ export class BookService {
         await prisma.book.update({
           where: { id },
           data: { status },
+        });
+      },
+      () => {}
+    );
+  }
+
+  /**
+   * Update PDF metadata for a book
+   */
+  static async updateBookPdfInfo(
+    id: string,
+    data: {
+      pdfUrl?: string | null;
+      pdfStatus?: 'not_started' | 'generating' | 'completed' | 'failed';
+      paperSize?: string;
+      orientation?: string;
+    }
+  ): Promise<void> {
+    const book = memoryBooks.get(id);
+    if (book) {
+      if (data.pdfUrl !== undefined) book.pdfUrl = data.pdfUrl;
+      if (data.pdfStatus !== undefined) book.pdfStatus = data.pdfStatus;
+      if (data.paperSize !== undefined) book.paperSize = data.paperSize;
+      if (data.orientation !== undefined) book.orientation = data.orientation;
+      book.updatedAt = new Date().toISOString();
+    }
+
+    await tryDb(
+      async () => {
+        await prisma.book.update({
+          where: { id },
+          data: {
+            pdfUrl: data.pdfUrl,
+            pdfStatus: data.pdfStatus,
+            paperSize: data.paperSize,
+            orientation: data.orientation,
+          },
         });
       },
       () => {}

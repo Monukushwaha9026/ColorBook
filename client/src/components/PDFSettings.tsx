@@ -1,5 +1,5 @@
 import React from 'react';
-import { FileText, ArrowRight, Printer, Check, Loader2 } from 'lucide-react';
+import { FileText, ArrowRight, Printer, Check, Loader2, AlertCircle } from 'lucide-react';
 import type { PaperSize, Orientation } from '../types';
 
 interface PDFSettingsProps {
@@ -10,6 +10,7 @@ interface PDFSettingsProps {
   onOrientationChange: (orientation: Orientation) => void;
   onCreatePDF: () => void;
   isGeneratingPDF?: boolean;
+  errorMessage?: string | null;
 }
 
 export const PDFSettings: React.FC<PDFSettingsProps> = ({
@@ -20,9 +21,16 @@ export const PDFSettings: React.FC<PDFSettingsProps> = ({
   onOrientationChange,
   onCreatePDF,
   isGeneratingPDF = false,
+  errorMessage,
 }) => {
   return (
     <div className="w-full bg-white rounded-3xl border border-slate-200/90 shadow-soft p-6 sm:p-8">
+      {errorMessage && (
+        <div className="mb-6 p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 text-xs font-semibold flex items-center gap-3 animate-in fade-in">
+          <AlertCircle className="w-5 h-5 text-rose-600 shrink-0" />
+          <span>{errorMessage}</span>
+        </div>
+      )}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
         {/* Left: Info & Description */}
         <div className="max-w-md">

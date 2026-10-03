@@ -1,4 +1,4 @@
-import type { CreateBookPayload, AgeGroupId, BookStatus, ColoringPageItem, Book, PlanBookResponse } from '../types';
+import type { CreateBookPayload, AgeGroupId, BookStatus, ColoringPageItem, Book, PlanBookResponse, PaperSize, Orientation } from '../types';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
 
@@ -160,5 +160,25 @@ export const api = {
    */
   async listBooks(): Promise<{ success: boolean; books: Book[] }> {
     return request<{ success: boolean; books: Book[] }>('/books');
+  },
+
+  /**
+   * Generate a printable PDF for a book
+   */
+  async generatePdf(
+    bookId: string,
+    payload: { paperSize?: PaperSize; orientation?: Orientation } = {}
+  ): Promise<{ success: boolean; pdfUrl: string; pageCount: number; message: string }> {
+    return request<{ success: boolean; pdfUrl: string; pageCount: number; message: string }>(`/books/${bookId}/pdf`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  /**
+   * Get direct download URL for the book's PDF
+   */
+  getPdfDownloadUrl(bookId: string): string {
+    return `${API_BASE_URL}/books/${bookId}/pdf`;
   },
 };

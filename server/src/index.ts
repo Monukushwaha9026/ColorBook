@@ -6,6 +6,7 @@ import { bookRouter } from './routes/book.routes.js';
 import { healthRouter } from './routes/health.routes.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import { imageStorage } from './services/storage/local-image-storage.js';
+import { pdfStorage } from './services/pdf/pdf-storage.js';
 import { ImageProviderService } from './services/image/image-provider.service.js';
 
 dotenv.config();
@@ -25,9 +26,11 @@ app.use(
 app.use(express.json({ limit: '15mb' }));
 app.use(express.urlencoded({ extended: true, limit: '15mb' }));
 
-// Static file serving for stored coloring pages
+// Static file serving for stored coloring pages and printable PDFs
 app.use('/storage/images', express.static(imageStorage.getBaseDir()));
 app.use('/api/storage/images', express.static(imageStorage.getBaseDir()));
+app.use('/storage/pdfs', express.static(pdfStorage.getBaseDir()));
+app.use('/api/storage/pdfs', express.static(pdfStorage.getBaseDir()));
 
 // API Routes
 app.use('/api', healthRouter);

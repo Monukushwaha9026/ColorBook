@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { Download, Archive, Check, Sparkles, RefreshCw, FileText } from 'lucide-react';
+import { Download, Check, Sparkles, RefreshCw, FileText, SlidersHorizontal } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import type { PaperSize, Orientation } from '../types';
 
@@ -9,7 +9,7 @@ interface PDFSuccessCardProps {
   orientation: Orientation;
   bookTitle?: string;
   onDownloadPDF: () => void;
-  onDownloadZIP: () => void;
+  onChangeSettings?: () => void;
   onReset: () => void;
 }
 
@@ -19,7 +19,7 @@ export const PDFSuccessCard: React.FC<PDFSuccessCardProps> = ({
   orientation,
   bookTitle = 'ColorBook AI - Adventure Edition',
   onDownloadPDF,
-  onDownloadZIP,
+  onChangeSettings,
   onReset,
 }) => {
   useEffect(() => {
@@ -77,14 +77,16 @@ export const PDFSuccessCard: React.FC<PDFSuccessCardProps> = ({
           <span>Download PDF</span>
         </button>
 
-        <button
-          type="button"
-          onClick={onDownloadZIP}
-          className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-2xl bg-white border border-slate-300 hover:border-purple-300 hover:bg-purple-50/50 text-slate-700 font-bold text-sm shadow-xs transition-all cursor-pointer"
-        >
-          <Archive className="w-4 h-4 text-slate-500" />
-          <span>Download images as ZIP</span>
-        </button>
+        {onChangeSettings && (
+          <button
+            type="button"
+            onClick={onChangeSettings}
+            className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-2xl bg-white border border-slate-300 hover:border-purple-300 hover:bg-purple-50/50 text-slate-700 font-bold text-sm shadow-xs transition-all cursor-pointer"
+          >
+            <SlidersHorizontal className="w-4 h-4 text-slate-500" />
+            <span>Change PDF Settings</span>
+          </button>
+        )}
       </div>
 
       {/* Start New Book Link */}

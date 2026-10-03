@@ -1,6 +1,10 @@
+import path from 'path';
 import type { Request, Response, NextFunction } from 'express';
 import { BookService } from '../services/book.service.js';
 import { BookGenerationService } from '../services/ai/book-generation.service.js';
+import { PdfGeneratorService } from '../services/pdf/pdf-generator.service.js';
+import { pdfStorage } from '../services/pdf/pdf-storage.js';
+import { AppError } from '../middleware/errorHandler.js';
 
 export class BookController {
   static async list(_req: Request, res: Response, next: NextFunction): Promise<void> {
@@ -150,6 +154,60 @@ export class BookController {
       const id = String(req.params.id);
       const deleted = await BookService.deleteBook(id);
       res.json({ success: true, deleted });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  /**
+   * Generate a printable PDF from completed pages
+   */
+  static async generatePdf(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const bookId = String(req.params.id);
+      const { paperSize, orientation } = req.body || {};
+
+      const result = await PdfGeneratorService.generateBookPdf({
+        bookId,
+        paperSize,
+        orientation,
+      });
+
+      res.json({
+        success: true,
+        pdfUrl: result.pdfUrl,
+        pageCount: result.pageCount,
+        message: 'Printable PDF generated successfully.',
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  /**
+   * Download the generated PDF with a safe filename
+   */
+  static async downloadPdf(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const bookId = String(req.params.id);
+      const book = await BookService.getBookById(bookId);
+
+      if (!book) {
+        throw new AppError('Coloring book not found.', 404, 'NOT_FOUND');
+      }
+
+      if (!pdfStorage.pdfExists(bookId)) {
+        throw new AppError('No PDF found for this coloring book. Please generate the PDF first.', 404, 'PDF_NOT_FOUND');
+      }
+
+      const rawTitle = book.title || book.prompt || 'coloring-book';
+      const safeName = rawTitle.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'coloring-book';
+      const filename = `${safeName}-coloring-book.pdf`;
+
+      const pdfPath = pdfStorage.getPdfPath(bookId);
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.sendFile(path.resolve(pdfPath));
     } catch (err) {
       next(err);
     }

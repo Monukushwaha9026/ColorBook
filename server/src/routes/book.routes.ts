@@ -78,6 +78,19 @@ function checkReferenceImageErrors(req: any, _res: any, next: any) {
   next();
 }
 
+const generatePdfSchema = z.object({
+  paperSize: z
+    .enum(['A4', 'LETTER', 'a4', 'letter', 'US Letter', 'US_LETTER'], {
+      errorMap: () => ({ message: 'Invalid paper size. Must be A4 or LETTER.' }),
+    })
+    .optional(),
+  orientation: z
+    .enum(['PORTRAIT', 'LANDSCAPE', 'portrait', 'landscape'], {
+      errorMap: () => ({ message: 'Invalid orientation. Must be portrait or landscape.' }),
+    })
+    .optional(),
+});
+
 bookRouter.get('/', BookController.list);
 bookRouter.get('/:id', BookController.getById);
 bookRouter.post('/', checkReferenceImageErrors, validate(createBookSchema), BookController.create);
@@ -87,4 +100,6 @@ bookRouter.post('/:id/cancel', BookController.cancel);
 bookRouter.post('/:id/pages/:pageNumber/regenerate', BookController.regeneratePage);
 bookRouter.delete('/:id/pages/:pageNumber', BookController.deletePage);
 bookRouter.post('/:id/pages', BookController.savePages);
+bookRouter.post('/:id/pdf', validate(generatePdfSchema), BookController.generatePdf);
+bookRouter.get('/:id/pdf', BookController.downloadPdf);
 bookRouter.delete('/:id', BookController.delete);

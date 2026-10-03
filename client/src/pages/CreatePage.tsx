@@ -70,6 +70,7 @@ export const CreatePage: React.FC<CreatePageProps> = ({
   const [orientation, setOrientation] = useState<Orientation>('PORTRAIT');
   const [isGeneratingPDF, setIsGeneratingPDF] = useState<boolean>(false);
   const [pdfSuccess, setPdfSuccess] = useState<boolean>(false);
+  const [pdfError, setPdfError] = useState<string | null>(null);
 
   // Clean up polling timer on unmount
   useEffect(() => {
@@ -380,10 +381,35 @@ export const CreatePage: React.FC<CreatePageProps> = ({
   };
 
   // Trigger PDF Generation
-  const handleCreatePDF = () => {
+  const handleCreatePDF = async () => {
+    setPdfError(null);
+
+    if (generatedPages.length === 0) {
+      setPdfError('Your book has no pages. Generate a new page or return to creation.');
+      return;
+    }
+
+    const generatingPage = generatedPages.find((p) => p.status === 'generating' || p.isRegenerating);
+    if (generatingPage) {
+      setPdfError(`Page ${generatingPage.pageNumber} is still generating artwork. Please wait for generation to complete.`);
+      return;
+    }
+
+    const failedOrEmptyPage = generatedPages.find((p) => p.status === 'failed' || !p.imageUrl);
+    if (failedOrEmptyPage) {
+      setPdfError(`Page ${failedOrEmptyPage.pageNumber} is missing artwork. Please regenerate or remove it before creating the PDF.`);
+      return;
+    }
+
     setIsGeneratingPDF(true);
-    setTimeout(() => {
-      setIsGeneratingPDF(false);
+    try {
+      if (createdBookId) {
+        await api.generatePdf(createdBookId, {
+          paperSize: paperSize.toUpperCase() as 'A4' | 'LETTER',
+          orientation: orientation.toUpperCase() as 'PORTRAIT' | 'LANDSCAPE',
+        });
+      }
+
       setPdfSuccess(true);
       setCurrentStep(4);
 
@@ -403,10 +429,40 @@ export const CreatePage: React.FC<CreatePageProps> = ({
           referenceImage,
           createdAt: new Date().toISOString(),
           coverImage: generatedPages[0]?.imageUrl || '/illustrations/coloring-rocket.png',
+          pdfStatus: 'completed',
+          pdfUrl: createdBookId ? api.getPdfDownloadUrl(createdBookId) : undefined,
         };
         onSaveBook(newBook);
       }
-    }, 1200);
+    } catch (err: unknown) {
+      if (err instanceof ApiClientError) {
+        setPdfError(err.message);
+      } else if (err instanceof Error) {
+        setPdfError(err.message);
+      } else {
+        setPdfError('Failed to generate printable PDF. Please try again.');
+      }
+    } finally {
+      setIsGeneratingPDF(false);
+    }
+  };
+
+  const handleDownloadPDF = () => {
+    if (!createdBookId) {
+      alert('Book ID not found. Please regenerate or create a book first.');
+      return;
+    }
+    const downloadUrl = api.getPdfDownloadUrl(createdBookId);
+    const a = document.createElement('a');
+    a.href = downloadUrl;
+    const safeTitle = (bookTitle || prompt || 'coloring-book')
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/(^-|-$)/g, '');
+    a.download = `${safeTitle || 'coloring-book'}.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
   };
 
   // Reset to create another book
@@ -415,6 +471,7 @@ export const CreatePage: React.FC<CreatePageProps> = ({
     setCurrentStep(1);
     setGenerationPhase('idle');
     setPdfSuccess(false);
+    setPdfError(null);
     setGeneratedPages([]);
     setBookTitle('');
     setBookTheme('');
@@ -580,6 +637,7 @@ export const CreatePage: React.FC<CreatePageProps> = ({
             onOrientationChange={setOrientation}
             onCreatePDF={handleCreatePDF}
             isGeneratingPDF={isGeneratingPDF}
+            errorMessage={pdfError}
           />
         </div>
       )}
@@ -592,11 +650,10 @@ export const CreatePage: React.FC<CreatePageProps> = ({
             paperSize={paperSize}
             orientation={orientation}
             bookTitle={bookTitle || prompt.slice(0, 32)}
-            onDownloadPDF={() => {
-              alert(`Downloading printable PDF for "${bookTitle || 'ColorBook'}" (${generatedPages.length} pages, ${paperSize})`);
-            }}
-            onDownloadZIP={() => {
-              alert(`Downloading ZIP bundle: "${generatedPages.length} black-and-white coloring pages (PNG archive)"`);
+            onDownloadPDF={handleDownloadPDF}
+            onChangeSettings={() => {
+              setPdfSuccess(false);
+              setCurrentStep(3);
             }}
             onReset={handleReset}
           />

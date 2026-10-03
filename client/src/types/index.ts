@@ -42,6 +42,8 @@ export interface Book {
   pages: ColoringPageItem[];
   paperSize?: PaperSize;
   orientation?: Orientation;
+  pdfUrl?: string | null;
+  pdfStatus?: 'not_started' | 'generating' | 'completed' | 'failed';
   referenceImage?: string | null;
   referenceImageUrl?: string | null;
   createdAt: string;

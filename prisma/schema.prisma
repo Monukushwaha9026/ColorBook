@@ -48,6 +48,8 @@ model Book {
   status             BookStatus  @default(planning)
   paperSize          String      @default("A4")
   orientation        String      @default("PORTRAIT")
+  pdfUrl             String?
+  pdfStatus          String?     @default("not_started")
   pages              BookPage[]
   createdAt          DateTime    @default(now())
   updatedAt          DateTime    @updatedAt
